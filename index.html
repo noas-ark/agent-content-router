@@ -246,29 +246,6 @@
 // DATA
 // ═══════════════════════════════════════════════════════════════
 
-const SOURCES = [
-  {name:"Bloomberg",       price:3.00, auth:.95, topics:["finance","economics","markets"],   freshH:2,  type:"premium",
-   priceSource:"Cloudflare Pay-Per-Crawl",    priceDetail:"Bloomberg registered with Cloudflare's pay-per-crawl program. 402 response header returns crawler-price: 3.00 USD. Premium financial content, single-article access."},
-  {name:"WSJ",             price:2.50, auth:.93, topics:["finance","business","politics"],   freshH:4,  type:"premium",
-   priceSource:"TollBit registered publisher", priceDetail:"WSJ is listed in TollBit's publisher catalog at $2.50/article. Pricing verified against TollBit's public rate card. WSJ also has a Microsoft PCM deal but per-article access is TollBit-routed."},
-  {name:"Financial Times", price:3.50, auth:.94, topics:["finance","geopolitics","trade"],   freshH:3,  type:"premium",
-   priceSource:"RSL license + TollBit",        priceDetail:"FT publishes RSL terms at ft.com/robots.txt pointing to rsl-license.xml. Pay-per-crawl rate set at $3.50, classified as premium analysis. TollBit acts as merchant of record."},
-  {name:"Reuters",         price:0.80, auth:.88, topics:["news","finance","breaking"],       freshH:1,  type:"wire",
-   priceSource:"TollBit wire tier",            priceDetail:"Reuters wire content is priced at the budget tier on TollBit — high volume, fast-turnover news. 402 response includes crawler-price: 0.80. Lower price reflects commodity wire distribution model."},
-  {name:"AP",              price:0.70, auth:.87, topics:["news","general","breaking"],       freshH:1,  type:"wire",
-   priceSource:"Cloudflare Pay-Per-Crawl",    priceDetail:"AP uses Cloudflare's AI Crawl Control. 402 header: crawler-price: 0.70 USD. Slightly cheaper than Reuters; AP distributes syndicated wire broadly and prices for volume AI access."},
-  {name:"NYT",             price:1.50, auth:.91, topics:["news","politics","culture"],       freshH:6,  type:"mid",
-   priceSource:"Microsoft PCM",               priceDetail:"NYT is a launch partner in Microsoft's Publisher Content Marketplace (PCM). Usage-based pricing at ~$1.50/article for AI assistant access. PCM handles identity verification (KYA) and settlement via Stripe."},
-  {name:"TechCrunch",      price:0.50, auth:.82, topics:["tech","startups","AI"],            freshH:3,  type:"mid",
-   priceSource:"TollBit mid-tier",            priceDetail:"TechCrunch is in TollBit's standard publisher catalog. Mid-tier price at $0.50. Content is high-volume, topically specific (tech). 402 response negotiated via TollBit's bot authentication layer."},
-  {name:"Brookings",       price:0.00, auth:.89, topics:["policy","research","economics"],   freshH:72, type:"free",
-   priceSource:"Open access / no paywall",    priceDetail:"Brookings Institution publishes all content under open access. No robots.txt restriction on AI crawling. No RSL license required. Free to access — but no freshness guarantee and no 402 flow."},
-  {name:"arXiv",           price:0.00, auth:.87, topics:["science","AI","engineering"],      freshH:24, type:"free",
-   priceSource:"Open access (Cornell)",       priceDetail:"arXiv is operated by Cornell University with a fully open-access mandate. All preprints are freely crawlable. No TollBit, no 402, no RSL. High authority for technical queries but no editorial curation or breaking news."},
-  {name:"Wikipedia",       price:0.00, auth:.75, topics:["general","reference","history"],   freshH:168,type:"free",
-   priceSource:"CC BY-SA license",            priceDetail:"Wikipedia content is licensed under Creative Commons Attribution-ShareAlike. Freely crawlable and trainable with attribution. No paywall, no 402 response. Lowest freshness of all sources (weekly update cycle)."},
-];
-
 const SCENARIOS = [
   {tag:"Breaking Finance", q:"What exactly did Powell say this morning about rate cuts?"},
   {tag:"Earnings",         q:"TSMC just issued a profit warning — what are the specific details?"},
@@ -280,16 +257,6 @@ const SCENARIOS = [
   {tag:"Tech",             q:"What are the benchmark results for the new Gemini Ultra release?"},
 ];
 
-const DOMAIN_BOOST = {
-  financial_analysis: {Bloomberg:.32,WSJ:.24,"Financial Times":.28,Reuters:.12},
-  breaking_news:      {Reuters:.30,AP:.27,Bloomberg:.14,NYT:.10},
-  tech_product:       {TechCrunch:.32,arXiv:.14},
-  explainer:          {Wikipedia:.22,Brookings:.17,arXiv:.20},
-  policy:             {Brookings:.32,NYT:.15,"Financial Times":.14},
-  medical_clinical:   {arXiv:.30,NYT:.12},
-};
-
-const REDUNDANT = [["Reuters","AP"],["Bloomberg","Reuters"]];
 let totalRuns=0, sumSavings=0;
 
 // ═══════════════════════════════════════════════════════════════
@@ -346,253 +313,6 @@ document.addEventListener('mouseout', e => {
 });
 
 // ═══════════════════════════════════════════════════════════════
-// SIGNAL EXTRACTION ENGINE
-// ═══════════════════════════════════════════════════════════════
-
-function cosSim(a, b) {
-  const wa = new Set(a.toLowerCase().split(/\s+/).filter(w=>w.length>2));
-  const wb = new Set(b.toLowerCase().split(/\s+/).filter(w=>w.length>2));
-  if(!wa.size||!wb.size) return 0;
-  const inter = [...wa].filter(w=>wb.has(w)).length;
-  return inter / Math.sqrt(wa.size * wb.size);
-}
-
-function extractSignals(query) {
-  const q = query.toLowerCase();
-  const words = q.split(/\s+/);
-
-  // ── Intent classification ────────────────────────────────────
-  const intentProfiles = {
-    financial_analysis: "earnings revenue profit stock market investment quarterly financial economics gdp tariff semiconductor fund",
-    breaking_news:      "today latest breaking just announced hours minutes update urgent happened morning",
-    tech_product:       "product launch release features review specs benchmark model gpt llm capabilities version",
-    explainer:          "how does explain history background context overview understand mechanism works",
-    policy:             "regulation law policy act eu government legislation compliance requirement providers",
-    medical_clinical:   "clinical trial drug treatment therapy patient study health symptoms diagnosis results should take",
-  };
-  const intentScores = {};
-  for(const [k,v] of Object.entries(intentProfiles)){
-    intentScores[k] = cosSim(q, v);
-  }
-  const sorted = Object.entries(intentScores).sort((a,b)=>b[1]-a[1]);
-  const intent = sorted[0][0];
-  const topIntentScore = sorted[0][1];
-  const semanticRaw = Math.min(topIntentScore * 3.8 + .22, .98);
-
-  // ── DIMENSION 1: RELEVANCE ────────────────────────────────────
-  const entityRe = /\b([A-Z][a-z]{1,}(?:\s[A-Z][a-z]{1,})*|[A-Z]{2,6})\b/g;
-  const entities = [...(query.match(entityRe)||[])].filter(e=>e.length>1&&!/^(The|A|An|In|On|At|Is|It|If|Do|Be|We|My)$/.test(e));
-  const entityDensityRaw = Math.min(entities.length / 7, 1.0);
-
-  const specificMarkers = /\b(q[1-4]|20[2-9]\d|\$[\d]+|percent|%|basis\s*points|ipo|ceo|cfo|merger|acquisition|exactly|specific|detail|result)\b/i;
-  const specificityRaw = specificMarkers.test(q) ? .88 : words.length > 9 ? .65 : .38;
-
-  const templates = [
-    {pattern:/\b(earnings|revenue|profit)\b.*\b(q[1-4]|quarter|annual)\b/i, label:"<company>_earnings_<period>", boost:.22},
-    {pattern:/\b(what\s+did|said|announced|statement)\b/i,                  label:"<speaker>_statement",         boost:.18},
-    {pattern:/\b(clinical\s+trial|phase\s+[123]|fda)\b/i,                   label:"<medical_trial>",              boost:.20},
-    {pattern:/\b(today|this\s+morning|just|breaking)\b/i,                   label:"<breaking_event>",             boost:.15},
-    {pattern:/\b(compliance|regulation|act|law|requirement)\b/i,            label:"<policy_query>",               boost:.12},
-    {pattern:/\b(should\s+i|should\s+we)\b/i,                               label:"<decision_query>",             boost:.10},
-  ];
-  const matchedTemplate = templates.find(t=>t.pattern.test(query))||null;
-  const templateBoostRaw = 0.5 + (matchedTemplate?.boost||0);
-
-  const relevanceComposed = Math.min(.38*semanticRaw + .25*entityDensityRaw + .22*specificityRaw + .15*templateBoostRaw, .99);
-
-  // ── DIMENSION 2: CREDIBILITY ──────────────────────────────────
-  const highStakesPat   = /\b(should\s+i|should\s+we|invest|buy|sell|treatment|diagnosis|legal|liability|compliance|prescription|recommend)\b/i;
-  const medStakesPat    = /\b(impact|affect|influence|result|consequence|implication|effect)\b/i;
-  const stakesRaw = highStakesPat.test(q) ? .95 : medStakesPat.test(q) ? .68 : .38;
-
-  const sensitivityPat  = /\b(medical|clinical|legal|financial\s+advice|investment\s+advice|drug|diagnosis|prescription|liability|should\s+i\s+take)\b/i;
-  const sensitivityRaw  = sensitivityPat.test(q) ? .92 : /\b(finance|earnings|revenue|profit)\b/i.test(q) ? .72 : .30;
-
-  const controversyPat  = /\b(policy|regulation|debate|controversial|ban|restrict|versus|vs\.|disagree|dispute|different\s+views)\b/i;
-  const controversyRaw  = controversyPat.test(q) ? .78 : .28;
-
-  const corroborationRaw = Math.min(stakesRaw*.5 + controversyRaw*.3 + (intent==='breaking_news'?.25:0), 1.0);
-
-  const credibilityComposed = Math.min(.38*stakesRaw + .28*sensitivityRaw + .22*corroborationRaw + .12*controversyRaw, .99);
-
-  // ── DIMENSION 3: FRESHNESS ────────────────────────────────────
-  const nowPat     = /\b(today|this\s+morning|just|breaking|right\s+now|announced|hours\s+ago|minutes\s+ago|tonight|yesterday)\b/i;
-  const recentPat  = /\b(this\s+week|this\s+month|latest|recent|new|2025|2026|q[1-4]\s*202[456])\b/i;
-  const archivePat = /\b(history|background|how\s+does|explain|what\s+is|overview|2020|2019|2018|originally)\b/i;
-  const velocityRaw = nowPat.test(q) ? 1.0 : recentPat.test(q) ? .74 : archivePat.test(q) ? .12 : .38;
-
-  const timeMarkers = [];
-  if(nowPat.test(q))    timeMarkers.push('real-time (<4h)');
-  if(recentPat.test(q)) timeMarkers.push('recent (<7d)');
-  if(/\b(q[1-4])\b/i.test(q)) timeMarkers.push('quarterly');
-  if(/\b(202[3456])\b/.test(q)) timeMarkers.push('year-specific');
-  const temporalRaw = Math.min(velocityRaw + timeMarkers.length*.04, 1.0);
-
-  const eventPat    = /\b(earnings|ipo|merger|acquisition|rate\s+decision|vote|election|launch|announcement|profit\s+warning|down\s+\d|up\s+\d)\b/i;
-  const eventUrgencyRaw = eventPat.test(q) ? .82 : .22;
-
-  const halfLifeMap = {financial_analysis:.88, breaking_news:1.0, tech_product:.58, explainer:.10, policy:.42, medical_clinical:.36};
-  const decayRaw = halfLifeMap[intent]||.40;
-
-  const freshnessComposed = Math.min(.42*velocityRaw + .26*temporalRaw + .22*eventUrgencyRaw + .10*decayRaw, .99);
-  const freshnessRequired = freshnessComposed > .52;
-  const maxFreshnessHours = freshnessRequired ? (velocityRaw >= .9 ? 4 : 12) : (freshnessComposed > .4 ? 48 : 9999);
-
-  // ── DIMENSION 4: DEPTH ────────────────────────────────────────
-  const analyticalPat = /\b(analyze|analysis|impact|implication|compare|versus|tradeoff|why\s+is|explain\s+why|how\s+does|what\s+are\s+the)\b/i;
-  const complexityRaw = Math.min(.60*(analyticalPat.test(q)?.88:.35) + .40*(words.length/18), .99);
-
-  const depthPat    = /\b(comprehensive|detailed|in-depth|full\s+analysis|thorough|breakdown|deep\s+dive|specific|exactly)\b/i;
-  const depthRequired = depthPat.test(q) ? .92 : complexityRaw > .62 ? .72 : .32;
-
-  const navPat   = /\b(official|site|website|page|homepage|portal)\b/i;
-  const transPat = /\b(how\s+to|steps\s+to|guide|tutorial|sign\s+up)\b/i;
-  const questionType = navPat.test(q) ? 'navigational' : transPat.test(q) ? 'transactional' : 'informational';
-  const questionTypeScore = {informational:.65, navigational:.30, transactional:.48}[questionType];
-
-  const ambiguityPat = /\b(or|versus|vs\.|either|unclear|depends|different\s+views|perspective|both\s+sides)\b/i;
-  const ambiguityRaw = ambiguityPat.test(q) ? .76 : .24;
-
-  const depthComposed = Math.min(.40*complexityRaw + .32*depthRequired + .18*questionTypeScore + .10*ambiguityRaw, .99);
-
-  // ── Derived thresholds ────────────────────────────────────────
-  const qualityThreshold = Math.min(.60 + credibilityComposed*.30 + depthComposed*.08, .96);
-  const minSources = corroborationRaw > .60 ? 2 : 1;
-
-  return {
-    intent, intentScores, entities, matchedTemplate,
-    relevance:{
-      semantic:{v:semanticRaw,
-        tip:`<b>Semantic Match · ${pct(semanticRaw)}</b>Query text compared against 6 intent profile vocabularies using keyword cosine similarity.<div class="t-calc">Top intent: <span class="t-val">${intent.replace(/_/g,' ')}</span> (score: ${intentScores[intent].toFixed(3)})<br>Formula: intersection(query_words, profile_words) / √(|query| × |profile|)<br>Scaled: raw×3.8 + 0.22, capped at 0.98</div>`},
-      entityDensity:{v:entityDensityRaw,
-        tip:`<b>Entity Density · ${pct(entityDensityRaw)}</b>Named entities detected in query using regex for capitalized tokens.<div class="t-calc">Entities found: <span class="t-val">${entities.length > 0 ? entities.slice(0,5).join(', ') : 'none'}</span><br>Formula: min(entity_count / 7, 1.0)<br>Source: FB paper §3.1 "entity linking" component</div>`},
-      specificity:{v:specificityRaw,
-        tip:`<b>Specificity · ${pct(specificityRaw)}</b>How narrow vs. broad the query is. Specific queries justify paying for exact-match content.<div class="t-calc">Markers checked: Q1–Q4, year references, $amounts, %, IPO, CEO, "exactly", "specific"<br>Triggered: <span class="t-val">${specificMarkers.test(q)?'yes — scored 0.88':'no — scored by length ('+words.length+' words)'}</span><br>Narrow queries (0.8+) pay for precision; broad queries (0.3–0.5) can use general sources</div>`},
-      templateBoost:{v:templateBoostRaw,
-        tip:`<b>Template Boost · ${pct(templateBoostRaw)}</b>Structural pattern matching — does the query match a known high-value template?<div class="t-calc">Matched template: <span class="t-val">${matchedTemplate ? matchedTemplate.label : 'none'}</span><br>Boost applied: <span class="t-val">${matchedTemplate ? '+'+matchedTemplate.boost : '0 (baseline 0.5)'}</span><br>Source: FB paper §3.1 "Intent Template" — e.g. &lt;company&gt;_earnings_&lt;period&gt;</div>`},
-      composed:relevanceComposed,
-    },
-    credibility:{
-      stakes:{v:stakesRaw,
-        tip:`<b>Stakes Level · ${pct(stakesRaw)}</b>Is the user making a decision (high) or just seeking information (low)? High stakes = pay for authoritative sources.<div class="t-calc">High-stakes keywords: "should I", "invest", "treatment", "diagnosis", "legal"<br>Triggered: <span class="t-val">${highStakesPat.test(q)?'YES (0.95)':medStakesPat.test(q)?'medium (0.68)':'no (0.38)'}</span><br>Novel signal — not in FB paper or vLLM. Unique to content purchase optimization.</div>`},
-      sensitivity:{v:sensitivityRaw,
-        tip:`<b>Domain Sensitivity · ${pct(sensitivityRaw)}</b>Medical, legal, and financial advice queries require certified authoritative sources regardless of cost.<div class="t-calc">Sensitivity keywords: medical, clinical, legal, financial advice, drug, diagnosis, prescription<br>Triggered: <span class="t-val">${sensitivityPat.test(q)?'YES — high sensitivity domain (0.92)':sensitivityRaw>.6?'finance domain (0.72)':'general query (0.30)'}</span><br>Raises quality floor; free sources penalized in this regime.</div>`},
-      corroboration:{v:corroborationRaw,
-        tip:`<b>Corroboration Need · ${pct(corroborationRaw)}</b>How many independent sources are needed? High corroboration = buy ≥2 sources from different publishers.<div class="t-calc">Formula: stakes×0.5 + controversy×0.3 + (breaking?0.25:0)<br>Min sources required: <span class="t-val">${minSources}</span><br>High corroboration prevents over-reliance on single biased source.</div>`},
-      controversy:{v:controversyRaw,
-        tip:`<b>Controversy · ${pct(controversyRaw)}</b>Does this topic have multiple valid perspectives that a single source might miss or distort?<div class="t-calc">Controversy keywords: policy, debate, ban, restrict, vs., disagree, dispute<br>Triggered: <span class="t-val">${controversyPat.test(q)?'YES (0.78)':'no (0.28)'}</span><br>High controversy → diversify sources to avoid perspective bias.</div>`},
-      composed:credibilityComposed,
-    },
-    freshness:{
-      velocity:{v:velocityRaw,
-        tip:`<b>Velocity / Trending · ${pct(velocityRaw)}</b>How time-sensitive is the content? Drives whether we require real-time sources.<div class="t-calc">Real-time keywords: "today", "this morning", "just", "breaking", "right now"<br>Recent keywords: "this week", "latest", "2026", "Q1 2026"<br>Triggered: <span class="t-val">${nowPat.test(q)?'REAL-TIME (1.0)':recentPat.test(q)?'RECENT (0.74)':archivePat.test(q)?'ARCHIVAL (0.12)':'neutral (0.38)'}</span><br>Source: FB paper §3.1 "Trending Detection" component</div>`},
-      temporalMarkers:{v:temporalRaw,
-        tip:`<b>Temporal Markers · ${pct(temporalRaw)}</b>Explicit time references in the query. More markers = tighter freshness window.<div class="t-calc">Markers extracted: <span class="t-val">${timeMarkers.length ? timeMarkers.join(', ') : 'none'}</span><br>Formula: velocity + (marker_count × 0.04)<br>Max freshness age derived: <span class="t-val">${maxFreshnessHours >= 9999 ? 'unlimited' : maxFreshnessHours + ' hours'}</span></div>`},
-      eventUrgency:{v:eventUrgencyRaw,
-        tip:`<b>Event Urgency · ${pct(eventUrgencyRaw)}</b>Specific time-locked events (earnings, rate decisions, IPOs) that have a hard freshness deadline.<div class="t-calc">Event keywords: earnings, IPO, merger, rate decision, profit warning, "down X%"<br>Triggered: <span class="t-val">${eventPat.test(q)?'YES — event detected (0.82)':'no (0.22)'}</span><br>Events require sources published within the event window, not just recently.</div>`},
-      decayRate:{v:decayRaw,
-        tip:`<b>Decay Rate · ${pct(decayRaw)}</b>How fast does this type of content go stale? High decay = content worthless after hours.<div class="t-calc">By intent type:<br>• breaking_news: 1.0 (hourly decay)<br>• financial_analysis: 0.88 (daily)<br>• policy: 0.42 (weekly)<br>• explainer: 0.10 (evergreen)<br>Current intent: <span class="t-val">${intent} → ${decayRaw}</span></div>`},
-      composed:freshnessComposed,
-      required:freshnessRequired,
-      maxFreshnessHours, timeMarkers,
-    },
-    depth:{
-      complexity:{v:complexityRaw,
-        tip:`<b>Query Complexity · ${pct(complexityRaw)}</b>Analytical vs. simple factual query. Complex queries need deeper sources, not just headlines.<div class="t-calc">Analytical keywords: "analyze", "impact", "implication", "explain why", "why is"<br>Triggered: <span class="t-val">${analyticalPat.test(q)?'YES':'no'}</span><br>Length factor: ${words.length} words<br>Formula: 0.6×(analytical?0.88:0.35) + 0.4×(length/18)</div>`},
-      depthRequired:{v:depthRequired,
-        tip:`<b>Answer Depth Required · ${pct(depthRequired)}</b>Does the user want a headline (quick fact) or a deep-dive analysis?<div class="t-calc">Depth keywords: "comprehensive", "detailed", "specific", "exactly", "full analysis"<br>Triggered: <span class="t-val">${depthPat.test(q)?'YES (0.92)':complexityRaw>.62?'inferred from complexity (0.72)':'low (0.32)'}</span><br>High depth → penalize short articles; pay for long-form analysis.</div>`},
-      questionType:{v:questionTypeScore, raw:questionType,
-        tip:`<b>Question Type (Broder) · ${questionType}</b>Classic IR taxonomy from Broder 2002, cited in the FB paper.<div class="t-calc">Types:<br>• <b>Informational</b> — want facts/analysis → buy content (0.65)<br>• <b>Navigational</b> — want specific source → route directly (0.30)<br>• <b>Transactional</b> — want to do something → usually no purchase (0.48)<br>Detected: <span class="t-val">${questionType}</span></div>`},
-      ambiguity:{v:ambiguityRaw,
-        tip:`<b>Ambiguity / Multi-angle · ${pct(ambiguityRaw)}</b>Does the query need multiple perspectives to resolve? Ambiguous queries need diverse sources.<div class="t-calc">Ambiguity keywords: "versus", "vs.", "or", "different views", "both sides", "depends"<br>Triggered: <span class="t-val">${ambiguityPat.test(q)?'YES (0.76)':'no (0.24)'}</span><br>Novel signal — not in FB paper or vLLM routing.</div>`},
-      composed:depthComposed,
-    },
-    qualityThreshold, minSources, maxFreshnessHours,
-  };
-}
-
-// ═══════════════════════════════════════════════════════════════
-// PURCHASE OPTIMIZER (gated: eligibility first, then value rank)
-// ═══════════════════════════════════════════════════════════════
-
-function scoreSource(sigs, src) {
-  const {intent, freshness, credibility} = sigs;
-  const topicText = src.topics.join(' ');
-  const semantic  = Math.min(cosSim(intent.replace(/_/g,' '), topicText)*3.2 + .28, .96);
-  const authority = src.auth;
-  let fFit = .78;
-  if(freshness.required){
-    fFit = src.freshH <= 4 ? 1.0 : src.freshH <= 12 ? .55 : src.freshH <= 24 ? .28 : .05;
-  } else if(freshness.composed > .4){
-    fFit = src.freshH <= 48 ? .90 : .72;
-  }
-  // Hard penalty: freshness required + source is structurally stale (free sources)
-  if(freshness.required && src.price === 0) fFit *= .25;
-
-  const boost = (DOMAIN_BOOST[intent]||{})[src.name]||0;
-  const qFit  = credibility.composed > .70
-    ? ({premium:1.0, mid:.82, wire:.76, free:.52}[src.type]||.6)
-    : 1.0;
-
-  const utility = Math.min(.28*semantic + .24*authority + .24*fFit + .14*(0.5+boost) + .10*qFit, .99);
-  return {semantic, authority, freshnessFit:fFit, domainBoost:0.5+boost, qFit, utility};
-}
-
-function optimize(query) {
-  const sigs = extractSignals(query);
-  const budget = 12.0; // fixed generous budget — params removed per request
-  const scored = SOURCES.map(s => {
-    const sc = scoreSource(sigs, s);
-    return {...s, ...sc};
-  });
-
-  // GATE 1: Eligibility (hard filters)
-  const eligible = [], ineligible = [];
-  for(const s of scored){
-    const reasons = [];
-    if(s.freshH > sigs.maxFreshnessHours) reasons.push('too_stale');
-    if(s.utility < sigs.qualityThreshold - .12) reasons.push('low_utility');
-    reasons.length ? ineligible.push({...s, reason:reasons[0]}) : eligible.push(s);
-  }
-
-  // GATE 2: Value rank among eligible
-  eligible.sort((a,b) => (b.utility/Math.max(b.price,.01)) - (a.utility/Math.max(a.price,.01)));
-
-  // GATE 3: Select with diversity
-  const selected=[], rejected=[];
-  let spent=0;
-  const usedTypes=new Set(), usedNames=new Set();
-  for(const c of eligible){
-    if(spent+c.price > budget){ rejected.push({...c,reason:'over_budget'}); continue; }
-    const redundant = REDUNDANT.some(([a,b])=>(c.name===a&&usedNames.has(b))||(c.name===b&&usedNames.has(a)));
-    if(redundant){ rejected.push({...c,reason:'redundant'}); continue; }
-    const dupType = c.type!=='free' && usedTypes.has(c.type) && selected.length >= sigs.minSources;
-    if(dupType){ rejected.push({...c,reason:'dup_tier'}); continue; }
-    selected.push(c);
-    spent += c.price;
-    usedTypes.add(c.type);
-    usedNames.add(c.name);
-    if(selected.length >= Math.max(sigs.minSources+1, 2)) break;
-  }
-
-  // Naive: top 3 authority regardless
-  const naive = [...SOURCES].sort((a,b)=>b.auth-a.auth).slice(0,3);
-  const naiveCost = naive.reduce((s,x)=>s+x.price,0);
-  const naiveQ    = naive.reduce((s,x)=>s+x.auth,0)/naive.length;
-  const smartQ    = selected.length ? selected.reduce((s,x)=>s+x.utility,0)/selected.length : 0;
-
-  return {
-    sigs, selected,
-    ineligible: ineligible.slice(0,6),
-    rejected:   rejected.slice(0,4),
-    allScored:  scored,
-    smartCost:spent, smartQ, naiveCost, naiveQ,
-    savings:naiveCost-spent,
-    savingsPct:naiveCost>0?(naiveCost-spent)/naiveCost*100:0,
-  };
-}
-
-// ═══════════════════════════════════════════════════════════════
 // RENDER
 // ═══════════════════════════════════════════════════════════════
 
@@ -646,10 +366,74 @@ function sigRow(label, src, sigObj, dimColor, flag){
     </div>`;
 }
 
+// ═══════════════════════════════════════════════════════════════
+// BUILD SIGNAL OBJECTS FROM API RESPONSE
+// ═══════════════════════════════════════════════════════════════
+
+function buildSigObjects(sigs) {
+  const {intent, intentScores, entities, matchedTemplate, minSources} = sigs;
+  const R = sigs.relevance;
+  const C = sigs.credibility;
+  const F = sigs.freshness;
+  const D = sigs.depth;
+
+  return {
+    relevance: {
+      semantic: {v: R.semantic,
+        tip: `<b>Semantic Match · ${pct(R.semantic)}</b>Query text compared against 6 intent profile vocabularies using keyword cosine similarity.<div class="t-calc">Top intent: <span class="t-val">${intent.replace(/_/g,' ')}</span> (score: ${intentScores[intent].toFixed(3)})<br>Formula: intersection(query_words, profile_words) / √(|query| × |profile|)<br>Scaled: raw×3.8 + 0.22, capped at 0.98</div>`},
+      entityDensity: {v: R.entityDensity,
+        tip: `<b>Entity Density · ${pct(R.entityDensity)}</b>Named entities detected in query using regex for capitalized tokens.<div class="t-calc">Entities found: <span class="t-val">${entities.length > 0 ? entities.slice(0,5).join(', ') : 'none'}</span><br>Formula: min(entity_count / 7, 1.0)<br>Source: FB paper §3.1 "entity linking" component</div>`},
+      specificity: {v: R.specificity,
+        tip: `<b>Specificity · ${pct(R.specificity)}</b>How narrow vs. broad the query is. Specific queries justify paying for exact-match content.<div class="t-calc">Markers checked: Q1–Q4, year references, $amounts, %, IPO, CEO, "exactly", "specific"<br>Triggered: <span class="t-val">${R.specificTriggered ? 'yes — scored 0.88' : 'no — scored by length (' + R.wordCount + ' words)'}</span><br>Narrow queries (0.8+) pay for precision; broad queries (0.3–0.5) can use general sources</div>`},
+      templateBoost: {v: R.templateBoost,
+        tip: `<b>Template Boost · ${pct(R.templateBoost)}</b>Structural pattern matching — does the query match a known high-value template?<div class="t-calc">Matched template: <span class="t-val">${matchedTemplate ? matchedTemplate.label : 'none'}</span><br>Boost applied: <span class="t-val">${matchedTemplate ? '+' + matchedTemplate.boost : '0 (baseline 0.5)'}</span><br>Source: FB paper §3.1 "Intent Template" — e.g. &lt;company&gt;_earnings_&lt;period&gt;</div>`},
+      composed: R.composed,
+    },
+    credibility: {
+      stakes: {v: C.stakes,
+        tip: `<b>Stakes Level · ${pct(C.stakes)}</b>Is the user making a decision (high) or just seeking information (low)? High stakes = pay for authoritative sources.<div class="t-calc">High-stakes keywords: "should I", "invest", "treatment", "diagnosis", "legal"<br>Triggered: <span class="t-val">${C.stakesLevel === 'high' ? 'YES (0.95)' : C.stakesLevel === 'medium' ? 'medium (0.68)' : 'no (0.38)'}</span><br>Novel signal — not in FB paper or vLLM. Unique to content purchase optimization.</div>`},
+      sensitivity: {v: C.sensitivity,
+        tip: `<b>Domain Sensitivity · ${pct(C.sensitivity)}</b>Medical, legal, and financial advice queries require certified authoritative sources regardless of cost.<div class="t-calc">Sensitivity keywords: medical, clinical, legal, financial advice, drug, diagnosis, prescription<br>Triggered: <span class="t-val">${C.sensitivityLevel === 'high' ? 'YES — high sensitivity domain (0.92)' : C.sensitivityLevel === 'finance' ? 'finance domain (0.72)' : 'general query (0.30)'}</span><br>Raises quality floor; free sources penalized in this regime.</div>`},
+      corroboration: {v: C.corroboration,
+        tip: `<b>Corroboration Need · ${pct(C.corroboration)}</b>How many independent sources are needed? High corroboration = buy ≥2 sources from different publishers.<div class="t-calc">Formula: stakes×0.5 + controversy×0.3 + (breaking?0.25:0)<br>Min sources required: <span class="t-val">${minSources}</span><br>High corroboration prevents over-reliance on single biased source.</div>`},
+      controversy: {v: C.controversy,
+        tip: `<b>Controversy · ${pct(C.controversy)}</b>Does this topic have multiple valid perspectives that a single source might miss or distort?<div class="t-calc">Controversy keywords: policy, debate, ban, restrict, vs., disagree, dispute<br>Triggered: <span class="t-val">${C.controversyTriggered ? 'YES (0.78)' : 'no (0.28)'}</span><br>High controversy → diversify sources to avoid perspective bias.</div>`},
+      composed: C.composed,
+    },
+    freshness: {
+      velocity: {v: F.velocity,
+        tip: `<b>Velocity / Trending · ${pct(F.velocity)}</b>How time-sensitive is the content? Drives whether we require real-time sources.<div class="t-calc">Real-time keywords: "today", "this morning", "just", "breaking", "right now"<br>Recent keywords: "this week", "latest", "2026", "Q1 2026"<br>Triggered: <span class="t-val">${F.velocityLevel === 'real-time' ? 'REAL-TIME (1.0)' : F.velocityLevel === 'recent' ? 'RECENT (0.74)' : F.velocityLevel === 'archival' ? 'ARCHIVAL (0.12)' : 'neutral (0.38)'}</span><br>Source: FB paper §3.1 "Trending Detection" component</div>`},
+      temporalMarkers: {v: F.temporalMarkers,
+        tip: `<b>Temporal Markers · ${pct(F.temporalMarkers)}</b>Explicit time references in the query. More markers = tighter freshness window.<div class="t-calc">Markers extracted: <span class="t-val">${F.timeMarkers.length ? F.timeMarkers.join(', ') : 'none'}</span><br>Formula: velocity + (marker_count × 0.04)<br>Max freshness age derived: <span class="t-val">${F.maxFreshnessHours >= 9999 ? 'unlimited' : F.maxFreshnessHours + ' hours'}</span></div>`},
+      eventUrgency: {v: F.eventUrgency,
+        tip: `<b>Event Urgency · ${pct(F.eventUrgency)}</b>Specific time-locked events (earnings, rate decisions, IPOs) that have a hard freshness deadline.<div class="t-calc">Event keywords: earnings, IPO, merger, rate decision, profit warning, "down X%"<br>Triggered: <span class="t-val">${F.eventTriggered ? 'YES — event detected (0.82)' : 'no (0.22)'}</span><br>Events require sources published within the event window, not just recently.</div>`},
+      decayRate: {v: F.decayRate,
+        tip: `<b>Decay Rate · ${pct(F.decayRate)}</b>How fast does this type of content go stale? High decay = content worthless after hours.<div class="t-calc">By intent type:<br>• breaking_news: 1.0 (hourly decay)<br>• financial_analysis: 0.88 (daily)<br>• policy: 0.42 (weekly)<br>• explainer: 0.10 (evergreen)<br>Current intent: <span class="t-val">${intent} → ${F.decayRate}</span></div>`},
+      composed: F.composed,
+      required: F.required,
+      maxFreshnessHours: F.maxFreshnessHours,
+      timeMarkers: F.timeMarkers,
+    },
+    depth: {
+      complexity: {v: D.complexity,
+        tip: `<b>Query Complexity · ${pct(D.complexity)}</b>Analytical vs. simple factual query. Complex queries need deeper sources, not just headlines.<div class="t-calc">Analytical keywords: "analyze", "impact", "implication", "explain why", "why is"<br>Triggered: <span class="t-val">${D.analyticalTriggered ? 'YES' : 'no'}</span><br>Length factor: ${D.wordCount} words<br>Formula: 0.6×(analytical?0.88:0.35) + 0.4×(length/18)</div>`},
+      depthRequired: {v: D.depthRequired,
+        tip: `<b>Answer Depth Required · ${pct(D.depthRequired)}</b>Does the user want a headline (quick fact) or a deep-dive analysis?<div class="t-calc">Depth keywords: "comprehensive", "detailed", "specific", "exactly", "full analysis"<br>Triggered: <span class="t-val">${D.depthKeywordsTriggered ? 'YES (0.92)' : D.complexity > 0.62 ? 'inferred from complexity (0.72)' : 'low (0.32)'}</span><br>High depth → penalize short articles; pay for long-form analysis.</div>`},
+      questionType: {v: D.questionTypeScore, raw: D.questionType,
+        tip: `<b>Question Type (Broder) · ${D.questionType}</b>Classic IR taxonomy from Broder 2002, cited in the FB paper.<div class="t-calc">Types:<br>• <b>Informational</b> — want facts/analysis → buy content (0.65)<br>• <b>Navigational</b> — want specific source → route directly (0.30)<br>• <b>Transactional</b> — want to do something → usually no purchase (0.48)<br>Detected: <span class="t-val">${D.questionType}</span></div>`},
+      ambiguity: {v: D.ambiguity,
+        tip: `<b>Ambiguity / Multi-angle · ${pct(D.ambiguity)}</b>Does the query need multiple perspectives to resolve? Ambiguous queries need diverse sources.<div class="t-calc">Ambiguity keywords: "versus", "vs.", "or", "different views", "both sides", "depends"<br>Triggered: <span class="t-val">${D.ambiguityTriggered ? 'YES (0.76)' : 'no (0.24)'}</span><br>Novel signal — not in FB paper or vLLM routing.</div>`},
+      composed: D.composed,
+    },
+  };
+}
+
 function renderMiddle(res){
   const {sigs, selected, ineligible} = res;
-  const {intent, relevance:R, credibility:C, freshness:F, depth:D, entities, matchedTemplate} = sigs;
+  const {intent, entities, matchedTemplate} = sigs;
+  const F  = sigs.freshness;
   const im = INTENT_META[intent]||INTENT_META.explainer;
+  const so = buildSigObjects(sigs);
 
   // Source cards
   const srcCards = res.allScored.map(s => {
@@ -705,7 +489,7 @@ function renderMiddle(res){
     <!-- COMPOSED SCORES -->
     <div style="font-size:9px;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px">Composed Dimension Scores</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:16px">
-      ${Object.entries({relevance:R.composed,credibility:C.composed,freshness:F.composed,depth:D.composed}).map(([k,v])=>{
+      ${Object.entries({relevance:so.relevance.composed,credibility:so.credibility.composed,freshness:so.freshness.composed,depth:so.depth.composed}).map(([k,v])=>{
         const dm = DIM_META[k];
         return `<div class="composed-card">
           <div class="cc-label" style="color:${dm.color}">
@@ -725,12 +509,12 @@ function renderMiddle(res){
       <div class="dim-header">
         <span class="dim-tag" style="background:rgba(56,139,253,.1);color:var(--d-relevance)">D1 · Relevance</span>
         <span class="dim-desc">how specific & matched must the content be</span>
-        <span class="dim-composed" style="color:var(--d-relevance)">${pct(R.composed)}</span>
+        <span class="dim-composed" style="color:var(--d-relevance)">${pct(so.relevance.composed)}</span>
       </div>
-      ${sigRow('Semantic Match',       'keyword cosine sim vs. intent profiles',       R.semantic,      'var(--d-relevance)')}
-      ${sigRow('Entity Density',       'FB §3.1 entity linking · named tokens found',  R.entityDensity, 'var(--d-relevance)')}
-      ${sigRow('Specificity',          'narrow (high) vs. broad query (low)',           R.specificity,   'var(--d-relevance)')}
-      ${sigRow('Template Match Boost', 'FB §3.1 intent template · structural pattern', R.templateBoost, 'var(--d-relevance)', matchedTemplate?{text:matchedTemplate.label,color:'var(--text-dim)',bg:'var(--surface3)'}:null)}
+      ${sigRow('Semantic Match',       'keyword cosine sim vs. intent profiles',       so.relevance.semantic,      'var(--d-relevance)')}
+      ${sigRow('Entity Density',       'FB §3.1 entity linking · named tokens found',  so.relevance.entityDensity, 'var(--d-relevance)')}
+      ${sigRow('Specificity',          'narrow (high) vs. broad query (low)',           so.relevance.specificity,   'var(--d-relevance)')}
+      ${sigRow('Template Match Boost', 'FB §3.1 intent template · structural pattern', so.relevance.templateBoost, 'var(--d-relevance)', matchedTemplate?{text:matchedTemplate.label,color:'var(--text-dim)',bg:'var(--surface3)'}:null)}
     </div>
 
     <!-- D2: CREDIBILITY -->
@@ -738,17 +522,17 @@ function renderMiddle(res){
       <div class="dim-header">
         <span class="dim-tag" style="background:rgba(210,153,34,.1);color:var(--d-credibility)">D2 · Credibility</span>
         <span class="dim-desc">how authoritative the source must be</span>
-        <span class="dim-composed" style="color:var(--d-credibility)">${pct(C.composed)}</span>
+        <span class="dim-composed" style="color:var(--d-credibility)">${pct(so.credibility.composed)}</span>
       </div>
-      ${sigRow('Stakes Level',      'decision-making vs. info-seeking',     C.stakes,        'var(--d-credibility)',
-        C.stakes.v>.80?{text:'HIGH',color:'#f85149',bg:'rgba(248,81,73,.12)'}:
-        C.stakes.v>.55?{text:'MED', color:'#d29922',bg:'rgba(210,153,34,.12)'}:
+      ${sigRow('Stakes Level',      'decision-making vs. info-seeking',     so.credibility.stakes,        'var(--d-credibility)',
+        so.credibility.stakes.v>.80?{text:'HIGH',color:'#f85149',bg:'rgba(248,81,73,.12)'}:
+        so.credibility.stakes.v>.55?{text:'MED', color:'#d29922',bg:'rgba(210,153,34,.12)'}:
         {text:'LOW',color:'#3fb950',bg:'rgba(63,185,80,.12)'})}
-      ${sigRow('Domain Sensitivity','medical / legal / financial',          C.sensitivity,   'var(--d-credibility)')}
-      ${sigRow('Corroboration',     'independent sources needed',           C.corroboration, 'var(--d-credibility)',
-        C.corroboration.v>.60?{text:`≥${sigs.minSources} sources`,color:'#d29922',bg:'rgba(210,153,34,.12)'}:
+      ${sigRow('Domain Sensitivity','medical / legal / financial',          so.credibility.sensitivity,   'var(--d-credibility)')}
+      ${sigRow('Corroboration',     'independent sources needed',           so.credibility.corroboration, 'var(--d-credibility)',
+        so.credibility.corroboration.v>.60?{text:`≥${sigs.minSources} sources`,color:'#d29922',bg:'rgba(210,153,34,.12)'}:
         {text:'1 source',color:'var(--text-muted)',bg:'var(--surface3)'})}
-      ${sigRow('Controversy',       'multiple perspectives required',       C.controversy,   'var(--d-credibility)')}
+      ${sigRow('Controversy',       'multiple perspectives required',       so.credibility.controversy,   'var(--d-credibility)')}
     </div>
 
     <!-- D3: FRESHNESS -->
@@ -756,16 +540,16 @@ function renderMiddle(res){
       <div class="dim-header">
         <span class="dim-tag" style="background:rgba(248,81,73,.1);color:var(--d-freshness)">D3 · Freshness</span>
         <span class="dim-desc">how time-sensitive the content must be${F.required?' · <span style="color:var(--red)">max '+sigs.maxFreshnessHours+'h</span>':''}</span>
-        <span class="dim-composed" style="color:var(--d-freshness)">${pct(F.composed)}</span>
+        <span class="dim-composed" style="color:var(--d-freshness)">${pct(so.freshness.composed)}</span>
       </div>
-      ${sigRow('Velocity / Trending', 'FB §3.1 trending detection · time keywords',  F.velocity,       'var(--d-freshness)',
-        F.velocity.v>=.90?{text:'REAL-TIME',color:'#f85149',bg:'rgba(248,81,73,.12)'}:
-        F.velocity.v>=.60?{text:'RECENT',   color:'#d29922',bg:'rgba(210,153,34,.12)'}:
+      ${sigRow('Velocity / Trending', 'FB §3.1 trending detection · time keywords',  so.freshness.velocity,        'var(--d-freshness)',
+        so.freshness.velocity.v>=.90?{text:'REAL-TIME',color:'#f85149',bg:'rgba(248,81,73,.12)'}:
+        so.freshness.velocity.v>=.60?{text:'RECENT',   color:'#d29922',bg:'rgba(210,153,34,.12)'}:
         {text:'ARCHIVAL',color:'var(--text-muted)',bg:'var(--surface3)'})}
-      ${sigRow('Temporal Markers',    'extracted time refs: today / Q1 / year',       F.temporalMarkers,'var(--d-freshness)',
+      ${sigRow('Temporal Markers',    'extracted time refs: today / Q1 / year',       so.freshness.temporalMarkers, 'var(--d-freshness)',
         F.timeMarkers.length?{text:F.timeMarkers[0],color:'var(--text-dim)',bg:'var(--surface3)'}:null)}
-      ${sigRow('Event Urgency',       'earnings / rate decision / IPO detected',       F.eventUrgency,   'var(--d-freshness)')}
-      ${sigRow('Decay Rate',          'how fast this topic type goes stale',           F.decayRate,      'var(--d-freshness)')}
+      ${sigRow('Event Urgency',       'earnings / rate decision / IPO detected',       so.freshness.eventUrgency,    'var(--d-freshness)')}
+      ${sigRow('Decay Rate',          'how fast this topic type goes stale',           so.freshness.decayRate,       'var(--d-freshness)')}
     </div>
 
     <!-- D4: DEPTH -->
@@ -773,13 +557,13 @@ function renderMiddle(res){
       <div class="dim-header">
         <span class="dim-tag" style="background:rgba(188,140,255,.1);color:var(--d-depth)">D4 · Depth</span>
         <span class="dim-desc">novel · not in FB paper or vLLM router</span>
-        <span class="dim-composed" style="color:var(--d-depth)">${pct(D.composed)}</span>
+        <span class="dim-composed" style="color:var(--d-depth)">${pct(so.depth.composed)}</span>
       </div>
-      ${sigRow('Query Complexity',    'analytical language + query length',            D.complexity,     'var(--d-depth)')}
-      ${sigRow('Answer Depth Req.',   'headline vs. deep-dive needed',                 D.depthRequired,  'var(--d-depth)')}
-      ${sigRow('Question Type',       'Broder 2002 taxonomy (cited in FB paper)',      D.questionType,   'var(--d-depth)',
-        {text:D.questionType.raw||'informational',color:'var(--text-dim)',bg:'var(--surface3)'})}
-      ${sigRow('Ambiguity / Hedge',   'multiple angles needed to resolve',             D.ambiguity,      'var(--d-depth)')}
+      ${sigRow('Query Complexity',    'analytical language + query length',            so.depth.complexity,     'var(--d-depth)')}
+      ${sigRow('Answer Depth Req.',   'headline vs. deep-dive needed',                 so.depth.depthRequired,  'var(--d-depth)')}
+      ${sigRow('Question Type',       'Broder 2002 taxonomy (cited in FB paper)',      so.depth.questionType,   'var(--d-depth)',
+        {text:so.depth.questionType.raw||'informational',color:'var(--text-dim)',bg:'var(--surface3)'})}
+      ${sigRow('Ambiguity / Hedge',   'multiple angles needed to resolve',             so.depth.ambiguity,      'var(--d-depth)')}
     </div>
 
     <!-- SOURCE SCORING -->
@@ -862,22 +646,29 @@ function renderRight(res){
 // INIT
 // ═══════════════════════════════════════════════════════════════
 
-function go(){
+async function go(){
   const q = document.getElementById('qi').value.trim();
   if(!q){ document.getElementById('qi').focus(); return; }
   const btn = document.getElementById('runBtn');
   btn.textContent='⟳ Analyzing...'; btn.classList.add('loading');
   document.getElementById('midDot').classList.add('on');
   document.getElementById('rightDot').classList.add('on');
-  setTimeout(()=>{
-    const res = optimize(q);
+  try {
+    const resp = await fetch('/optimize', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({query: q})
+    });
+    const res = await resp.json();
     renderMiddle(res); renderRight(res);
     totalRuns++;
     sumSavings += res.savingsPct;
     document.getElementById('totalRuns').textContent = totalRuns;
     document.getElementById('avgSavings').textContent = Math.round(sumSavings/totalRuns)+'%';
+  } catch(err) { console.error(err); }
+  finally {
     btn.textContent='▶ Optimize'; btn.classList.remove('loading');
-  }, 300);
+  }
 }
 
 function init(){
