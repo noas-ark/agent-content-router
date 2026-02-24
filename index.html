@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Content Purchase Optimizer · Signal Lab</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#080c10; --surface:#0d1117; --surface2:#161b22; --surface3:#1c2333;
+    --border:#21262d; --border2:#30363d;
+    --text:#e6edf3; --text-dim:#8b949e; --text-muted:#484f58;
+    --green:#3fb950; --green-dim:#196c2e;
+    --red:#f85149; --yellow:#d29922; --blue:#388bfd; --purple:#bc8cff;
+    --accent:#39d353; --accent-dim:rgba(57,211,83,.08);
+    --d-relevance:#388bfd;
+    --d-credibility:#d29922;
+    --d-freshness:#f85149;
+    --d-depth:#bc8cff;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'IBM Plex Mono',monospace;background:var(--bg);color:var(--text);height:100vh;display:flex;flex-direction:column;overflow:hidden}
+
+  /* TOP BAR */
+  .topbar{height:44px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 20px;gap:14px;flex-shrink:0}
+  .logo{display:flex;align-items:center;gap:9px;font-size:13px;font-weight:600;letter-spacing:.04em}
+  .logo-icon{width:20px;height:20px;background:var(--accent);border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:10px;color:#000;font-weight:700}
+  .sep{width:1px;height:18px;background:var(--border2)}
+  .badge{font-size:10px;padding:2px 7px;background:rgba(57,211,83,.1);color:var(--accent);border-radius:20px;border:1px solid rgba(57,211,83,.2)}
+  .tbar-stat{font-size:10px;color:var(--text-dim);display:flex;align-items:center;gap:5px}
+  .tbar-stat span{color:var(--accent);font-weight:500}
+  .ml-auto{margin-left:auto}
+  .pulse-dot{width:5px;height:5px;border-radius:50%;background:var(--accent);animation:pulse 2s infinite}
+
+  /* LAYOUT */
+  .main{flex:1;display:grid;grid-template-columns:280px 1fr 320px;overflow:hidden}
+  .panel{border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+  .panel:last-child{border-right:none}
+  .ph{height:34px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 14px;gap:7px;font-size:10px;color:var(--text-dim);letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
+  .ph-dot{width:6px;height:6px;border-radius:50%;background:var(--text-muted)}
+  .ph-dot.on{background:var(--accent);box-shadow:0 0 5px var(--accent)}
+  .pb{flex:1;overflow-y:auto;padding:14px}
+  ::-webkit-scrollbar{width:3px}
+  ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+
+  /* INPUTS */
+  .lbl{font-size:9px;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px;margin-top:13px}
+  .lbl:first-child{margin-top:0}
+  textarea{width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:5px;color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:1.6;padding:10px;resize:none;outline:none;transition:border-color .15s;min-height:72px}
+  textarea:focus{border-color:var(--accent)}
+  textarea::placeholder{color:var(--text-muted)}
+  .run-btn{width:100%;margin-top:13px;padding:10px;background:var(--accent);color:#000;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;letter-spacing:.08em;border:none;border-radius:5px;cursor:pointer;transition:all .15s;text-transform:uppercase}
+  .run-btn:hover{background:#58e86a;transform:translateY(-1px)}
+  .run-btn.loading{background:var(--surface3);color:var(--text-muted);cursor:not-allowed;transform:none}
+  .divider{height:1px;background:var(--border);margin:12px 0}
+  .sc-chip{padding:7px 9px;background:var(--surface2);border:1px solid var(--border2);border-radius:4px;font-size:10px;color:var(--text-dim);cursor:pointer;transition:all .15s;line-height:1.4;margin-bottom:5px}
+  .sc-chip:hover{border-color:var(--accent);color:var(--text);background:var(--accent-dim)}
+  .sc-tag{font-size:8px;color:var(--text-muted);letter-spacing:.08em;text-transform:uppercase;margin-bottom:2px}
+
+  /* SIGNAL ROWS */
+  .dim-section{margin-bottom:20px}
+  .dim-header{display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:6px 10px;background:var(--surface2);border-radius:4px;border:1px solid var(--border)}
+  .dim-tag{font-size:9px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;padding:2px 8px;border-radius:3px}
+  .dim-composed{margin-left:auto;font-size:11px;font-weight:600}
+  .dim-desc{font-size:9px;color:var(--text-muted)}
+
+  .sig-row{display:grid;grid-template-columns:1fr 120px 52px;align-items:center;gap:8px;margin-bottom:8px;padding:5px 0;border-bottom:1px solid var(--border)}
+  .sig-row:last-child{border-bottom:none}
+  .sig-name{font-size:10px;color:var(--text);font-weight:500}
+  .sig-source{font-size:8px;color:var(--text-muted);margin-top:1px}
+  .bar-wrap{height:5px;background:var(--surface3);border-radius:3px;overflow:hidden}
+  .bar-fill{height:100%;border-radius:3px;transition:width .7s cubic-bezier(.4,0,.2,1)}
+
+  /* HOVERABLE VALUE */
+  .sig-val-wrap{position:relative;display:inline-block}
+  .sig-val{
+    font-size:11px;font-weight:600;cursor:help;
+    padding:2px 7px;border-radius:3px;
+    border:1px solid transparent;
+    transition:all .15s;
+    display:inline-block;
+    white-space:nowrap;
+  }
+  .sig-val:hover{border-color:var(--border2);background:var(--surface3)}
+
+  /* TOOLTIP */
+  .tooltip{
+    position:fixed;
+    z-index:1000;
+    width:240px;
+    background:#0d1117;
+    border:1px solid var(--border2);
+    border-radius:6px;
+    padding:10px 12px;
+    font-size:10px;
+    line-height:1.65;
+    color:var(--text-dim);
+    pointer-events:none;
+    opacity:0;
+    transition:opacity .15s;
+    box-shadow:0 8px 24px rgba(0,0,0,.6);
+  }
+  .tooltip.show{opacity:1}
+  .tooltip b{color:var(--text);display:block;margin-bottom:4px;font-size:10px}
+  .tooltip .t-calc{
+    margin-top:6px;padding-top:6px;
+    border-top:1px solid var(--border);
+    font-size:9px;color:var(--text-muted);
+    font-family:'IBM Plex Sans',sans-serif;
+  }
+  .tooltip .t-val{color:var(--accent);font-weight:600}
+
+  /* FLAG BADGE */
+  .sig-flag{font-size:8px;padding:2px 6px;border-radius:3px;font-weight:600;letter-spacing:.05em;white-space:nowrap}
+
+  /* COMPOSED SCORES */
+  .composed-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:16px}
+  .composed-card{background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:10px}
+  .cc-label{font-size:9px;color:var(--text-muted);letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px;display:flex;align-items:center;gap:5px}
+  .cc-val{font-size:22px;font-weight:600;line-height:1}
+
+  /* SOURCE CARDS */
+  .src-card{background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:9px 11px;margin-bottom:7px;display:grid;grid-template-columns:1fr 70px 80px;align-items:center;gap:8px;opacity:0;transform:translateX(-8px);transition:all .3s}
+  .src-card.vis{opacity:1;transform:translateX(0)}
+  .src-card.sel{border-color:var(--accent);background:var(--accent-dim)}
+  .src-card.rej{opacity:.28}
+  .src-n{font-size:11px;font-weight:500}
+  .src-m{font-size:9px;color:var(--text-muted);margin-top:1px}
+  .src-bar{height:3px;background:var(--surface3);border-radius:2px;margin-top:5px;overflow:hidden}
+  .src-bf{height:100%;border-radius:2px}
+
+  /* HOVERABLE PRICE */
+  .src-price-wrap{position:relative;text-align:right}
+  .src-price{
+    font-size:11px;font-weight:600;cursor:help;
+    padding:2px 6px;border-radius:3px;
+    border:1px solid transparent;
+    transition:all .15s;
+    display:inline-block;
+  }
+  .src-price:hover{border-color:var(--border2);background:var(--surface3)}
+  .src-status{font-size:8px;letter-spacing:.06em;text-transform:uppercase;text-align:right;margin-top:2px}
+
+  /* UTILITY MINI BARS */
+  .src-util{text-align:center}
+  .src-util-val{font-size:12px;font-weight:600}
+  .src-util-lbl{font-size:8px;color:var(--text-muted);margin-top:1px}
+
+  /* RIGHT PANEL */
+  .metric-pair{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:7px}
+  .mc{background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:10px 12px}
+  .mc-lbl{font-size:9px;color:var(--text-muted);letter-spacing:.08em;text-transform:uppercase;margin-bottom:3px}
+  .mc-val{font-size:20px;font-weight:600;line-height:1.1}
+  .mc-sub{font-size:10px;color:var(--text-muted);margin-top:2px}
+  .savings-wrap{background:var(--surface3);height:6px;border-radius:4px;overflow:hidden;margin:7px 0}
+  .savings-fill{height:100%;background:linear-gradient(90deg,var(--green-dim),var(--green));border-radius:4px;width:0%;transition:width .9s cubic-bezier(.4,0,.2,1) .2s}
+  .pi{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--accent-dim);border:1px solid rgba(57,211,83,.2);border-radius:4px;margin-bottom:6px;opacity:0;transform:translateY(5px);transition:all .3s}
+  .pi.vis{opacity:1;transform:translateY(0)}
+  .pi-name{flex:1;font-size:11px}
+  .pi-util{font-size:9px;color:var(--text-muted);background:var(--surface3);padding:2px 5px;border-radius:3px}
+  .pi-price{font-size:11px;font-weight:600;color:var(--accent)}
+  .roi-card{background:var(--surface2);border:1px solid var(--border2);border-radius:5px;padding:12px;margin-top:7px}
+  .roi-hdr{font-size:9px;color:var(--text-muted);letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px}
+  .roi-row{display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--border);font-size:10px}
+  .roi-row:last-child{border-bottom:none}
+  .roi-row .rl{color:var(--text-dim)}
+  .roi-row .rv{color:var(--text);font-weight:500}
+  .roi-row .rv.hi{color:var(--accent);font-size:13px}
+
+  .intent-badge{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:3px;font-size:9px;font-weight:600;letter-spacing:.1em;text-transform:uppercase}
+  .st{font-size:9px;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px;margin-top:14px;display:flex;align-items:center;gap:7px}
+  .st::after{content:'';flex:1;height:1px;background:var(--border)}
+  .empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:10px;color:var(--text-muted);font-size:10px;text-align:center;padding:20px}
+  .empty-icon{font-size:28px;opacity:.25;margin-bottom:3px}
+
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+  .fade-in{animation:fadeIn .35s ease forwards}
+  .src-card:nth-child(1){transition-delay:.03s} .src-card:nth-child(2){transition-delay:.07s}
+  .src-card:nth-child(3){transition-delay:.11s} .src-card:nth-child(4){transition-delay:.15s}
+  .src-card:nth-child(5){transition-delay:.19s} .src-card:nth-child(6){transition-delay:.23s}
+  .src-card:nth-child(7){transition-delay:.27s} .src-card:nth-child(8){transition-delay:.31s}
+  .src-card:nth-child(9){transition-delay:.35s} .src-card:nth-child(10){transition-delay:.39s}
+  .pi:nth-child(1){transition-delay:.35s} .pi:nth-child(2){transition-delay:.5s} .pi:nth-child(3){transition-delay:.65s}
+</style>
+</head>
+<body>
+
+<!-- GLOBAL TOOLTIP -->
+<div class="tooltip" id="tooltip"></div>
+
+<div class="topbar">
+  <div class="logo"><div class="logo-icon">⬡</div>Content Purchase Optimizer</div>
+  <div class="sep"></div>
+  <span style="font-size:10px;color:var(--text-dim);letter-spacing:.06em">Signal Lab</span>
+  <span class="badge">v0.3</span>
+  <div class="ml-auto" style="display:flex;align-items:center;gap:14px">
+    <div class="tbar-stat">runs <span id="totalRuns">0</span></div>
+    <div class="tbar-stat">avg saved <span id="avgSavings">—</span></div>
+    <div class="sep"></div>
+    <div class="tbar-stat"><div class="pulse-dot"></div> live</div>
+  </div>
+</div>
+
+<div class="main">
+
+<!-- LEFT: INPUT -->
+<div class="panel">
+  <div class="ph"><div class="ph-dot on"></div>Query Input</div>
+  <div class="pb">
+    <div class="lbl">Query</div>
+    <textarea id="qi" rows="4" placeholder="e.g. What exactly did Powell say this morning about rate cuts?"></textarea>
+    <button class="run-btn" id="runBtn" onclick="go()">▶ Optimize</button>
+    <div class="divider"></div>
+    <div class="lbl">Examples</div>
+    <div id="chips"></div>
+  </div>
+</div>
+
+<!-- MIDDLE: SIGNAL EXTRACTION -->
+<div class="panel">
+  <div class="ph"><div class="ph-dot" id="midDot"></div>Signal Extraction · 4-Dimension Framework</div>
+  <div class="pb" id="midP">
+    <div class="empty">
+      <div class="empty-icon">⬡</div>
+      <div>Run a query to see<br>full signal breakdown<br><br><span style="font-size:9px;opacity:.6">hover any value to see<br>how it was calculated</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- RIGHT: PURCHASE PLAN -->
+<div class="panel">
+  <div class="ph"><div class="ph-dot" id="rightDot"></div>Purchase Plan · ROI</div>
+  <div class="pb" id="rightP">
+    <div class="empty">
+      <div class="empty-icon">$</div>
+      <div>Purchase plan will<br>appear here<br><br><span style="font-size:9px;opacity:.6">hover any price to see<br>how it was estimated</span></div>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// DATA
+// ═══════════════════════════════════════════════════════════════
+
+const SOURCES = [
+  {name:"Bloomberg",       price:3.00, auth:.95, topics:["finance","economics","markets"],   freshH:2,  type:"premium",
+   priceSource:"Cloudflare Pay-Per-Crawl",    priceDetail:"Bloomberg registered with Cloudflare's pay-per-crawl program. 402 response header returns crawler-price: 3.00 USD. Premium financial content, single-article access."},
+  {name:"WSJ",             price:2.50, auth:.93, topics:["finance","business","politics"],   freshH:4,  type:"premium",
+   priceSource:"TollBit registered publisher", priceDetail:"WSJ is listed in TollBit's publisher catalog at $2.50/article. Pricing verified against TollBit's public rate card. WSJ also has a Microsoft PCM deal but per-article access is TollBit-routed."},
+  {name:"Financial Times", price:3.50, auth:.94, topics:["finance","geopolitics","trade"],   freshH:3,  type:"premium",
+   priceSource:"RSL license + TollBit",        priceDetail:"FT publishes RSL terms at ft.com/robots.txt pointing to rsl-license.xml. Pay-per-crawl rate set at $3.50, classified as premium analysis. TollBit acts as merchant of record."},
+  {name:"Reuters",         price:0.80, auth:.88, topics:["news","finance","breaking"],       freshH:1,  type:"wire",
+   priceSource:"TollBit wire tier",            priceDetail:"Reuters wire content is priced at the budget tier on TollBit — high volume, fast-turnover news. 402 response includes crawler-price: 0.80. Lower price reflects commodity wire distribution model."},
+  {name:"AP",              price:0.70, auth:.87, topics:["news","general","breaking"],       freshH:1,  type:"wire",
+   priceSource:"Cloudflare Pay-Per-Crawl",    priceDetail:"AP uses Cloudflare's AI Crawl Control. 402 header: crawler-price: 0.70 USD. Slightly cheaper than Reuters; AP distributes syndicated wire broadly and prices for volume AI access."},
+  {name:"NYT",             price:1.50, auth:.91, topics:["news","politics","culture"],       freshH:6,  type:"mid",
+   priceSource:"Microsoft PCM",               priceDetail:"NYT is a launch partner in Microsoft's Publisher Content Marketplace (PCM). Usage-based pricing at ~$1.50/article for AI assistant access. PCM handles identity verification (KYA) and settlement via Stripe."},
+  {name:"TechCrunch",      price:0.50, auth:.82, topics:["tech","startups","AI"],            freshH:3,  type:"mid",
+   priceSource:"TollBit mid-tier",            priceDetail:"TechCrunch is in TollBit's standard publisher catalog. Mid-tier price at $0.50. Content is high-volume, topically specific (tech). 402 response negotiated via TollBit's bot authentication layer."},
+  {name:"Brookings",       price:0.00, auth:.89, topics:["policy","research","economics"],   freshH:72, type:"free",
+   priceSource:"Open access / no paywall",    priceDetail:"Brookings Institution publishes all content under open access. No robots.txt restriction on AI crawling. No RSL license required. Free to access — but no freshness guarantee and no 402 flow."},
+  {name:"arXiv",           price:0.00, auth:.87, topics:["science","AI","engineering"],      freshH:24, type:"free",
+   priceSource:"Open access (Cornell)",       priceDetail:"arXiv is operated by Cornell University with a fully open-access mandate. All preprints are freely crawlable. No TollBit, no 402, no RSL. High authority for technical queries but no editorial curation or breaking news."},
+  {name:"Wikipedia",       price:0.00, auth:.75, topics:["general","reference","history"],   freshH:168,type:"free",
+   priceSource:"CC BY-SA license",            priceDetail:"Wikipedia content is licensed under Creative Commons Attribution-ShareAlike. Freely crawlable and trainable with attribution. No paywall, no 402 response. Lowest freshness of all sources (weekly update cycle)."},
+];
+
+const SCENARIOS = [
+  {tag:"Breaking Finance", q:"What exactly did Powell say this morning about rate cuts?"},
+  {tag:"Earnings",         q:"TSMC just issued a profit warning — what are the specific details?"},
+  {tag:"Market Move",      q:"Why is NVIDIA stock down 8% right now?"},
+  {tag:"M&A",              q:"What did Goldman analysts say about the Microsoft Activision deal today?"},
+  {tag:"Policy",           q:"EU AI Act compliance requirements for foundation model providers"},
+  {tag:"Research",         q:"How does transformer self-attention work?"},
+  {tag:"Medical",          q:"Should I take ozempic for weight loss — what do clinical studies show?"},
+  {tag:"Tech",             q:"What are the benchmark results for the new Gemini Ultra release?"},
+];
+
+const DOMAIN_BOOST = {
+  financial_analysis: {Bloomberg:.32,WSJ:.24,"Financial Times":.28,Reuters:.12},
+  breaking_news:      {Reuters:.30,AP:.27,Bloomberg:.14,NYT:.10},
+  tech_product:       {TechCrunch:.32,arXiv:.14},
+  explainer:          {Wikipedia:.22,Brookings:.17,arXiv:.20},
+  policy:             {Brookings:.32,NYT:.15,"Financial Times":.14},
+  medical_clinical:   {arXiv:.30,NYT:.12},
+};
+
+const REDUNDANT = [["Reuters","AP"],["Bloomberg","Reuters"]];
+let totalRuns=0, sumSavings=0;
+
+// ═══════════════════════════════════════════════════════════════
+// TOOLTIP ENGINE — registry-based (no HTML in data attributes)
+// ═══════════════════════════════════════════════════════════════
+
+const tip = document.getElementById('tooltip');
+let tipTimeout;
+const TIP_REGISTRY = {};
+let tipIdCounter = 0;
+
+function registerTip(html) {
+  const id = 'tip_' + (tipIdCounter++);
+  TIP_REGISTRY[id] = html;
+  return id;
+}
+
+function showTip(el) {
+  clearTimeout(tipTimeout);
+  const id = el.dataset.tipid;
+  if (!id || !TIP_REGISTRY[id]) return;
+  tip.innerHTML = TIP_REGISTRY[id];
+  tip.classList.add('show');
+  positionTip(el);
+}
+
+function positionTip(el) {
+  const r = el.getBoundingClientRect();
+  const tw = 240;
+  tip.style.visibility = 'hidden';
+  tip.style.display = 'block';
+  const th = tip.offsetHeight || 120;
+  tip.style.visibility = '';
+  let left = r.right + 10;
+  let top  = r.top;
+  if (left + tw > window.innerWidth - 10) left = r.left - tw - 10;
+  if (top + th > window.innerHeight - 10) top = window.innerHeight - th - 10;
+  tip.style.left = left + 'px';
+  tip.style.top  = Math.max(8, top) + 'px';
+}
+
+function hideTip() {
+  tipTimeout = setTimeout(() => tip.classList.remove('show'), 120);
+}
+
+// Single delegated listener — no inline handlers needed
+document.addEventListener('mouseover', e => {
+  const el = e.target.closest('[data-tipid]');
+  if (el) { clearTimeout(tipTimeout); showTip(el); }
+  else if (!e.target.closest('#tooltip')) hideTip();
+});
+document.addEventListener('mouseout', e => {
+  if (!e.target.closest('[data-tipid]') && !e.target.closest('#tooltip')) hideTip();
+});
+
+// ═══════════════════════════════════════════════════════════════
+// SIGNAL EXTRACTION ENGINE
+// ═══════════════════════════════════════════════════════════════
+
+function cosSim(a, b) {
+  const wa = new Set(a.toLowerCase().split(/\s+/).filter(w=>w.length>2));
+  const wb = new Set(b.toLowerCase().split(/\s+/).filter(w=>w.length>2));
+  if(!wa.size||!wb.size) return 0;
+  const inter = [...wa].filter(w=>wb.has(w)).length;
+  return inter / Math.sqrt(wa.size * wb.size);
+}
+
+function extractSignals(query) {
+  const q = query.toLowerCase();
+  const words = q.split(/\s+/);
+
+  // ── Intent classification ────────────────────────────────────
+  const intentProfiles = {
+    financial_analysis: "earnings revenue profit stock market investment quarterly financial economics gdp tariff semiconductor fund",
+    breaking_news:      "today latest breaking just announced hours minutes update urgent happened morning",
+    tech_product:       "product launch release features review specs benchmark model gpt llm capabilities version",
+    explainer:          "how does explain history background context overview understand mechanism works",
+    policy:             "regulation law policy act eu government legislation compliance requirement providers",
+    medical_clinical:   "clinical trial drug treatment therapy patient study health symptoms diagnosis results should take",
+  };
+  const intentScores = {};
+  for(const [k,v] of Object.entries(intentProfiles)){
+    intentScores[k] = cosSim(q, v);
+  }
+  const sorted = Object.entries(intentScores).sort((a,b)=>b[1]-a[1]);
+  const intent = sorted[0][0];
+  const topIntentScore = sorted[0][1];
+  const semanticRaw = Math.min(topIntentScore * 3.8 + .22, .98);
+
+  // ── DIMENSION 1: RELEVANCE ────────────────────────────────────
+  const entityRe = /\b([A-Z][a-z]{1,}(?:\s[A-Z][a-z]{1,})*|[A-Z]{2,6})\b/g;
+  const entities = [...(query.match(entityRe)||[])].filter(e=>e.length>1&&!/^(The|A|An|In|On|At|Is|It|If|Do|Be|We|My)$/.test(e));
+  const entityDensityRaw = Math.min(entities.length / 7, 1.0);
+
+  const specificMarkers = /\b(q[1-4]|20[2-9]\d|\$[\d]+|percent|%|basis\s*points|ipo|ceo|cfo|merger|acquisition|exactly|specific|detail|result)\b/i;
+  const specificityRaw = specificMarkers.test(q) ? .88 : words.length > 9 ? .65 : .38;
+
+  const templates = [
+    {pattern:/\b(earnings|revenue|profit)\b.*\b(q[1-4]|quarter|annual)\b/i, label:"<company>_earnings_<period>", boost:.22},
+    {pattern:/\b(what\s+did|said|announced|statement)\b/i,                  label:"<speaker>_statement",         boost:.18},
+    {pattern:/\b(clinical\s+trial|phase\s+[123]|fda)\b/i,                   label:"<medical_trial>",              boost:.20},
+    {pattern:/\b(today|this\s+morning|just|breaking)\b/i,                   label:"<breaking_event>",             boost:.15},
+    {pattern:/\b(compliance|regulation|act|law|requirement)\b/i,            label:"<policy_query>",               boost:.12},
+    {pattern:/\b(should\s+i|should\s+we)\b/i,                               label:"<decision_query>",             boost:.10},
+  ];
+  const matchedTemplate = templates.find(t=>t.pattern.test(query))||null;
+  const templateBoostRaw = 0.5 + (matchedTemplate?.boost||0);
+
+  const relevanceComposed = Math.min(.38*semanticRaw + .25*entityDensityRaw + .22*specificityRaw + .15*templateBoostRaw, .99);
+
+  // ── DIMENSION 2: CREDIBILITY ──────────────────────────────────
+  const highStakesPat   = /\b(should\s+i|should\s+we|invest|buy|sell|treatment|diagnosis|legal|liability|compliance|prescription|recommend)\b/i;
+  const medStakesPat    = /\b(impact|affect|influence|result|consequence|implication|effect)\b/i;
+  const stakesRaw = highStakesPat.test(q) ? .95 : medStakesPat.test(q) ? .68 : .38;
+
+  const sensitivityPat  = /\b(medical|clinical|legal|financial\s+advice|investment\s+advice|drug|diagnosis|prescription|liability|should\s+i\s+take)\b/i;
+  const sensitivityRaw  = sensitivityPat.test(q) ? .92 : /\b(finance|earnings|revenue|profit)\b/i.test(q) ? .72 : .30;
+
+  const controversyPat  = /\b(policy|regulation|debate|controversial|ban|restrict|versus|vs\.|disagree|dispute|different\s+views)\b/i;
+  const controversyRaw  = controversyPat.test(q) ? .78 : .28;
+
+  const corroborationRaw = Math.min(stakesRaw*.5 + controversyRaw*.3 + (intent==='breaking_news'?.25:0), 1.0);
+
+  const credibilityComposed = Math.min(.38*stakesRaw + .28*sensitivityRaw + .22*corroborationRaw + .12*controversyRaw, .99);
+
+  // ── DIMENSION 3: FRESHNESS ────────────────────────────────────
+  const nowPat     = /\b(today|this\s+morning|just|breaking|right\s+now|announced|hours\s+ago|minutes\s+ago|tonight|yesterday)\b/i;
+  const recentPat  = /\b(this\s+week|this\s+month|latest|recent|new|2025|2026|q[1-4]\s*202[456])\b/i;
+  const archivePat = /\b(history|background|how\s+does|explain|what\s+is|overview|2020|2019|2018|originally)\b/i;
+  const velocityRaw = nowPat.test(q) ? 1.0 : recentPat.test(q) ? .74 : archivePat.test(q) ? .12 : .38;
+
+  const timeMarkers = [];
+  if(nowPat.test(q))    timeMarkers.push('real-time (<4h)');
+  if(recentPat.test(q)) timeMarkers.push('recent (<7d)');
+  if(/\b(q[1-4])\b/i.test(q)) timeMarkers.push('quarterly');
+  if(/\b(202[3456])\b/.test(q)) timeMarkers.push('year-specific');
+  const temporalRaw = Math.min(velocityRaw + timeMarkers.length*.04, 1.0);
+
+  const eventPat    = /\b(earnings|ipo|merger|acquisition|rate\s+decision|vote|election|launch|announcement|profit\s+warning|down\s+\d|up\s+\d)\b/i;
+  const eventUrgencyRaw = eventPat.test(q) ? .82 : .22;
+
+  const halfLifeMap = {financial_analysis:.88, breaking_news:1.0, tech_product:.58, explainer:.10, policy:.42, medical_clinical:.36};
+  const decayRaw = halfLifeMap[intent]||.40;
+
+  const freshnessComposed = Math.min(.42*velocityRaw + .26*temporalRaw + .22*eventUrgencyRaw + .10*decayRaw, .99);
+  const freshnessRequired = freshnessComposed > .52;
+  const maxFreshnessHours = freshnessRequired ? (velocityRaw >= .9 ? 4 : 12) : (freshnessComposed > .4 ? 48 : 9999);
+
+  // ── DIMENSION 4: DEPTH ────────────────────────────────────────
+  const analyticalPat = /\b(analyze|analysis|impact|implication|compare|versus|tradeoff|why\s+is|explain\s+why|how\s+does|what\s+are\s+the)\b/i;
+  const complexityRaw = Math.min(.60*(analyticalPat.test(q)?.88:.35) + .40*(words.length/18), .99);
+
+  const depthPat    = /\b(comprehensive|detailed|in-depth|full\s+analysis|thorough|breakdown|deep\s+dive|specific|exactly)\b/i;
+  const depthRequired = depthPat.test(q) ? .92 : complexityRaw > .62 ? .72 : .32;
+
+  const navPat   = /\b(official|site|website|page|homepage|portal)\b/i;
+  const transPat = /\b(how\s+to|steps\s+to|guide|tutorial|sign\s+up)\b/i;
+  const questionType = navPat.test(q) ? 'navigational' : transPat.test(q) ? 'transactional' : 'informational';
+  const questionTypeScore = {informational:.65, navigational:.30, transactional:.48}[questionType];
+
+  const ambiguityPat = /\b(or|versus|vs\.|either|unclear|depends|different\s+views|perspective|both\s+sides)\b/i;
+  const ambiguityRaw = ambiguityPat.test(q) ? .76 : .24;
+
+  const depthComposed = Math.min(.40*complexityRaw + .32*depthRequired + .18*questionTypeScore + .10*ambiguityRaw, .99);
+
+  // ── Derived thresholds ────────────────────────────────────────
+  const qualityThreshold = Math.min(.60 + credibilityComposed*.30 + depthComposed*.08, .96);
+  const minSources = corroborationRaw > .60 ? 2 : 1;
+
+  return {
+    intent, intentScores, entities, matchedTemplate,
+    relevance:{
+      semantic:{v:semanticRaw,
+        tip:`<b>Semantic Match · ${pct(semanticRaw)}</b>Query text compared against 6 intent profile vocabularies using keyword cosine similarity.<div class="t-calc">Top intent: <span class="t-val">${intent.replace(/_/g,' ')}</span> (score: ${intentScores[intent].toFixed(3)})<br>Formula: intersection(query_words, profile_words) / √(|query| × |profile|)<br>Scaled: raw×3.8 + 0.22, capped at 0.98</div>`},
+      entityDensity:{v:entityDensityRaw,
+        tip:`<b>Entity Density · ${pct(entityDensityRaw)}</b>Named entities detected in query using regex for capitalized tokens.<div class="t-calc">Entities found: <span class="t-val">${entities.length > 0 ? entities.slice(0,5).join(', ') : 'none'}</span><br>Formula: min(entity_count / 7, 1.0)<br>Source: FB paper §3.1 "entity linking" component</div>`},
+      specificity:{v:specificityRaw,
+        tip:`<b>Specificity · ${pct(specificityRaw)}</b>How narrow vs. broad the query is. Specific queries justify paying for exact-match content.<div class="t-calc">Markers checked: Q1–Q4, year references, $amounts, %, IPO, CEO, "exactly", "specific"<br>Triggered: <span class="t-val">${specificMarkers.test(q)?'yes — scored 0.88':'no — scored by length ('+words.length+' words)'}</span><br>Narrow queries (0.8+) pay for precision; broad queries (0.3–0.5) can use general sources</div>`},
+      templateBoost:{v:templateBoostRaw,
+        tip:`<b>Template Boost · ${pct(templateBoostRaw)}</b>Structural pattern matching — does the query match a known high-value template?<div class="t-calc">Matched template: <span class="t-val">${matchedTemplate ? matchedTemplate.label : 'none'}</span><br>Boost applied: <span class="t-val">${matchedTemplate ? '+'+matchedTemplate.boost : '0 (baseline 0.5)'}</span><br>Source: FB paper §3.1 "Intent Template" — e.g. &lt;company&gt;_earnings_&lt;period&gt;</div>`},
+      composed:relevanceComposed,
+    },
+    credibility:{
+      stakes:{v:stakesRaw,
+        tip:`<b>Stakes Level · ${pct(stakesRaw)}</b>Is the user making a decision (high) or just seeking information (low)? High stakes = pay for authoritative sources.<div class="t-calc">High-stakes keywords: "should I", "invest", "treatment", "diagnosis", "legal"<br>Triggered: <span class="t-val">${highStakesPat.test(q)?'YES (0.95)':medStakesPat.test(q)?'medium (0.68)':'no (0.38)'}</span><br>Novel signal — not in FB paper or vLLM. Unique to content purchase optimization.</div>`},
+      sensitivity:{v:sensitivityRaw,
+        tip:`<b>Domain Sensitivity · ${pct(sensitivityRaw)}</b>Medical, legal, and financial advice queries require certified authoritative sources regardless of cost.<div class="t-calc">Sensitivity keywords: medical, clinical, legal, financial advice, drug, diagnosis, prescription<br>Triggered: <span class="t-val">${sensitivityPat.test(q)?'YES — high sensitivity domain (0.92)':sensitivityRaw>.6?'finance domain (0.72)':'general query (0.30)'}</span><br>Raises quality floor; free sources penalized in this regime.</div>`},
+      corroboration:{v:corroborationRaw,
+        tip:`<b>Corroboration Need · ${pct(corroborationRaw)}</b>How many independent sources are needed? High corroboration = buy ≥2 sources from different publishers.<div class="t-calc">Formula: stakes×0.5 + controversy×0.3 + (breaking?0.25:0)<br>Min sources required: <span class="t-val">${minSources}</span><br>High corroboration prevents over-reliance on single biased source.</div>`},
+      controversy:{v:controversyRaw,
+        tip:`<b>Controversy · ${pct(controversyRaw)}</b>Does this topic have multiple valid perspectives that a single source might miss or distort?<div class="t-calc">Controversy keywords: policy, debate, ban, restrict, vs., disagree, dispute<br>Triggered: <span class="t-val">${controversyPat.test(q)?'YES (0.78)':'no (0.28)'}</span><br>High controversy → diversify sources to avoid perspective bias.</div>`},
+      composed:credibilityComposed,
+    },
+    freshness:{
+      velocity:{v:velocityRaw,
+        tip:`<b>Velocity / Trending · ${pct(velocityRaw)}</b>How time-sensitive is the content? Drives whether we require real-time sources.<div class="t-calc">Real-time keywords: "today", "this morning", "just", "breaking", "right now"<br>Recent keywords: "this week", "latest", "2026", "Q1 2026"<br>Triggered: <span class="t-val">${nowPat.test(q)?'REAL-TIME (1.0)':recentPat.test(q)?'RECENT (0.74)':archivePat.test(q)?'ARCHIVAL (0.12)':'neutral (0.38)'}</span><br>Source: FB paper §3.1 "Trending Detection" component</div>`},
+      temporalMarkers:{v:temporalRaw,
+        tip:`<b>Temporal Markers · ${pct(temporalRaw)}</b>Explicit time references in the query. More markers = tighter freshness window.<div class="t-calc">Markers extracted: <span class="t-val">${timeMarkers.length ? timeMarkers.join(', ') : 'none'}</span><br>Formula: velocity + (marker_count × 0.04)<br>Max freshness age derived: <span class="t-val">${maxFreshnessHours >= 9999 ? 'unlimited' : maxFreshnessHours + ' hours'}</span></div>`},
+      eventUrgency:{v:eventUrgencyRaw,
+        tip:`<b>Event Urgency · ${pct(eventUrgencyRaw)}</b>Specific time-locked events (earnings, rate decisions, IPOs) that have a hard freshness deadline.<div class="t-calc">Event keywords: earnings, IPO, merger, rate decision, profit warning, "down X%"<br>Triggered: <span class="t-val">${eventPat.test(q)?'YES — event detected (0.82)':'no (0.22)'}</span><br>Events require sources published within the event window, not just recently.</div>`},
+      decayRate:{v:decayRaw,
+        tip:`<b>Decay Rate · ${pct(decayRaw)}</b>How fast does this type of content go stale? High decay = content worthless after hours.<div class="t-calc">By intent type:<br>• breaking_news: 1.0 (hourly decay)<br>• financial_analysis: 0.88 (daily)<br>• policy: 0.42 (weekly)<br>• explainer: 0.10 (evergreen)<br>Current intent: <span class="t-val">${intent} → ${decayRaw}</span></div>`},
+      composed:freshnessComposed,
+      required:freshnessRequired,
+      maxFreshnessHours, timeMarkers,
+    },
+    depth:{
+      complexity:{v:complexityRaw,
+        tip:`<b>Query Complexity · ${pct(complexityRaw)}</b>Analytical vs. simple factual query. Complex queries need deeper sources, not just headlines.<div class="t-calc">Analytical keywords: "analyze", "impact", "implication", "explain why", "why is"<br>Triggered: <span class="t-val">${analyticalPat.test(q)?'YES':'no'}</span><br>Length factor: ${words.length} words<br>Formula: 0.6×(analytical?0.88:0.35) + 0.4×(length/18)</div>`},
+      depthRequired:{v:depthRequired,
+        tip:`<b>Answer Depth Required · ${pct(depthRequired)}</b>Does the user want a headline (quick fact) or a deep-dive analysis?<div class="t-calc">Depth keywords: "comprehensive", "detailed", "specific", "exactly", "full analysis"<br>Triggered: <span class="t-val">${depthPat.test(q)?'YES (0.92)':complexityRaw>.62?'inferred from complexity (0.72)':'low (0.32)'}</span><br>High depth → penalize short articles; pay for long-form analysis.</div>`},
+      questionType:{v:questionTypeScore, raw:questionType,
+        tip:`<b>Question Type (Broder) · ${questionType}</b>Classic IR taxonomy from Broder 2002, cited in the FB paper.<div class="t-calc">Types:<br>• <b>Informational</b> — want facts/analysis → buy content (0.65)<br>• <b>Navigational</b> — want specific source → route directly (0.30)<br>• <b>Transactional</b> — want to do something → usually no purchase (0.48)<br>Detected: <span class="t-val">${questionType}</span></div>`},
+      ambiguity:{v:ambiguityRaw,
+        tip:`<b>Ambiguity / Multi-angle · ${pct(ambiguityRaw)}</b>Does the query need multiple perspectives to resolve? Ambiguous queries need diverse sources.<div class="t-calc">Ambiguity keywords: "versus", "vs.", "or", "different views", "both sides", "depends"<br>Triggered: <span class="t-val">${ambiguityPat.test(q)?'YES (0.76)':'no (0.24)'}</span><br>Novel signal — not in FB paper or vLLM routing.</div>`},
+      composed:depthComposed,
+    },
+    qualityThreshold, minSources, maxFreshnessHours,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PURCHASE OPTIMIZER (gated: eligibility first, then value rank)
+// ═══════════════════════════════════════════════════════════════
+
+function scoreSource(sigs, src) {
+  const {intent, freshness, credibility} = sigs;
+  const topicText = src.topics.join(' ');
+  const semantic  = Math.min(cosSim(intent.replace(/_/g,' '), topicText)*3.2 + .28, .96);
+  const authority = src.auth;
+  let fFit = .78;
+  if(freshness.required){
+    fFit = src.freshH <= 4 ? 1.0 : src.freshH <= 12 ? .55 : src.freshH <= 24 ? .28 : .05;
+  } else if(freshness.composed > .4){
+    fFit = src.freshH <= 48 ? .90 : .72;
+  }
+  // Hard penalty: freshness required + source is structurally stale (free sources)
+  if(freshness.required && src.price === 0) fFit *= .25;
+
+  const boost = (DOMAIN_BOOST[intent]||{})[src.name]||0;
+  const qFit  = credibility.composed > .70
+    ? ({premium:1.0, mid:.82, wire:.76, free:.52}[src.type]||.6)
+    : 1.0;
+
+  const utility = Math.min(.28*semantic + .24*authority + .24*fFit + .14*(0.5+boost) + .10*qFit, .99);
+  return {semantic, authority, freshnessFit:fFit, domainBoost:0.5+boost, qFit, utility};
+}
+
+function optimize(query) {
+  const sigs = extractSignals(query);
+  const budget = 12.0; // fixed generous budget — params removed per request
+  const scored = SOURCES.map(s => {
+    const sc = scoreSource(sigs, s);
+    return {...s, ...sc};
+  });
+
+  // GATE 1: Eligibility (hard filters)
+  const eligible = [], ineligible = [];
+  for(const s of scored){
+    const reasons = [];
+    if(s.freshH > sigs.maxFreshnessHours) reasons.push('too_stale');
+    if(s.utility < sigs.qualityThreshold - .12) reasons.push('low_utility');
+    reasons.length ? ineligible.push({...s, reason:reasons[0]}) : eligible.push(s);
+  }
+
+  // GATE 2: Value rank among eligible
+  eligible.sort((a,b) => (b.utility/Math.max(b.price,.01)) - (a.utility/Math.max(a.price,.01)));
+
+  // GATE 3: Select with diversity
+  const selected=[], rejected=[];
+  let spent=0;
+  const usedTypes=new Set(), usedNames=new Set();
+  for(const c of eligible){
+    if(spent+c.price > budget){ rejected.push({...c,reason:'over_budget'}); continue; }
+    const redundant = REDUNDANT.some(([a,b])=>(c.name===a&&usedNames.has(b))||(c.name===b&&usedNames.has(a)));
+    if(redundant){ rejected.push({...c,reason:'redundant'}); continue; }
+    const dupType = c.type!=='free' && usedTypes.has(c.type) && selected.length >= sigs.minSources;
+    if(dupType){ rejected.push({...c,reason:'dup_tier'}); continue; }
+    selected.push(c);
+    spent += c.price;
+    usedTypes.add(c.type);
+    usedNames.add(c.name);
+    if(selected.length >= Math.max(sigs.minSources+1, 2)) break;
+  }
+
+  // Naive: top 3 authority regardless
+  const naive = [...SOURCES].sort((a,b)=>b.auth-a.auth).slice(0,3);
+  const naiveCost = naive.reduce((s,x)=>s+x.price,0);
+  const naiveQ    = naive.reduce((s,x)=>s+x.auth,0)/naive.length;
+  const smartQ    = selected.length ? selected.reduce((s,x)=>s+x.utility,0)/selected.length : 0;
+
+  return {
+    sigs, selected,
+    ineligible: ineligible.slice(0,6),
+    rejected:   rejected.slice(0,4),
+    allScored:  scored,
+    smartCost:spent, smartQ, naiveCost, naiveQ,
+    savings:naiveCost-spent,
+    savingsPct:naiveCost>0?(naiveCost-spent)/naiveCost*100:0,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════════════════════════════
+
+const INTENT_META = {
+  financial_analysis: {label:"Financial Analysis",  color:"#d29922",bg:"rgba(210,153,34,.12)"},
+  breaking_news:      {label:"Breaking News",        color:"#f85149",bg:"rgba(248,81,73,.12)"},
+  tech_product:       {label:"Tech Coverage",        color:"#388bfd",bg:"rgba(56,139,253,.12)"},
+  explainer:          {label:"Research / Explainer", color:"#bc8cff",bg:"rgba(188,140,255,.12)"},
+  policy:             {label:"Policy Analysis",      color:"#39d353",bg:"rgba(57,211,83,.12)"},
+  medical_clinical:   {label:"Medical / Clinical",   color:"#ff7b72",bg:"rgba(255,123,114,.12)"},
+};
+
+const DIM_META = {
+  relevance:   {label:"Relevance",   color:"var(--d-relevance)"},
+  credibility: {label:"Credibility", color:"var(--d-credibility)"},
+  freshness:   {label:"Freshness",   color:"var(--d-freshness)"},
+  depth:       {label:"Depth",       color:"var(--d-depth)"},
+};
+
+function pct(v){ return (v*100).toFixed(0)+'%'; }
+
+function valColor(v, dimColor){
+  return v > .72 ? dimColor : v > .45 ? 'var(--text-dim)' : 'var(--text-muted)';
+}
+
+function makeSigVal(v, tipHtml, dimColor, flag){
+  const vc = valColor(v, dimColor);
+  const pctStr = pct(v);
+  const id = registerTip(tipHtml);
+  if(flag){
+    return `<div style="display:flex;align-items:center;gap:4px">
+      <span class="sig-val" style="color:${vc}" data-tipid="${id}">${pctStr}</span>
+      <span class="sig-flag" style="background:${flag.bg};color:${flag.color}">${flag.text}</span>
+    </div>`;
+  }
+  return `<span class="sig-val" style="color:${vc}" data-tipid="${id}">${pctStr}</span>`;
+}
+
+function sigRow(label, src, sigObj, dimColor, flag){
+  const barC = valColor(sigObj.v, dimColor);
+  return `
+    <div class="sig-row">
+      <div>
+        <div class="sig-name">${label}</div>
+        <div class="sig-source">${src}</div>
+      </div>
+      <div class="bar-wrap">
+        <div class="bar-fill" style="width:${pct(sigObj.v)};background:${barC}"></div>
+      </div>
+      ${makeSigVal(sigObj.v, sigObj.tip, dimColor, flag)}
+    </div>`;
+}
+
+function renderMiddle(res){
+  const {sigs, selected, ineligible} = res;
+  const {intent, relevance:R, credibility:C, freshness:F, depth:D, entities, matchedTemplate} = sigs;
+  const im = INTENT_META[intent]||INTENT_META.explainer;
+
+  // Source cards
+  const srcCards = res.allScored.map(s => {
+    const isSel = selected.find(x=>x.name===s.name);
+    const isIne = ineligible.find(x=>x.name===s.name);
+    const isRej = res.rejected.find(x=>x.name===s.name);
+    const reasonLabel = {too_stale:'stale', low_utility:'low util', over_budget:'over budget', redundant:'redundant', dup_tier:'dup tier'}[(isIne||isRej)?.reason]||'';
+    const bColor = isSel ? 'var(--green)' : s.utility>.70 ? 'var(--yellow)' : 'var(--text-muted)';
+
+    // Price tooltip — registered, not stored in attribute
+    const priceTipHtml = '<b>Price: ' + (s.price===0?'FREE':'$'+s.price.toFixed(2)) + '</b>' +
+      'Source: ' + s.priceSource +
+      '<div class="t-calc">' + s.priceDetail + '</div>';
+    const priceTipId = registerTip(priceTipHtml);
+    const priceDisplay = s.price===0
+      ? `<span class="src-price" style="color:var(--green)" data-tipid="${priceTipId}">FREE</span>`
+      : `<span class="src-price" style="color:var(--text)" data-tipid="${priceTipId}">$${s.price.toFixed(2)}</span>`;
+
+    return `
+      <div class="src-card ${isSel?'sel':(isIne||isRej)?'rej':''}">
+        <div>
+          <div class="src-n">${s.name}</div>
+          <div class="src-m">${s.topics.slice(0,2).join(', ')} · ${s.type}${F.required&&s.freshH>sigs.maxFreshnessHours?' · <span style="color:var(--red)">'+s.freshH+'h lag</span>':''}</div>
+          <div class="src-bar"><div class="src-bf" style="width:${pct(s.utility)};background:${bColor}"></div></div>
+        </div>
+        <div class="src-util">
+          <div class="src-util-val" style="color:${bColor}">${pct(s.utility)}</div>
+          <div class="src-util-lbl">utility</div>
+        </div>
+        <div class="src-price-wrap">
+          ${priceDisplay}
+          <div class="src-status" style="color:${isSel?'var(--green)':(isIne||isRej)?'#484f58':'var(--text-muted)'}">
+            ${isSel?'✓ selected':reasonLabel||'—'}
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+
+  document.getElementById('midP').innerHTML = `
+  <div class="fade-in">
+
+    <!-- INTENT -->
+    <div style="margin-bottom:14px">
+      <div style="font-size:9px;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:7px">Intent Detected</div>
+      <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">
+        <span class="intent-badge" style="color:${im.color};background:${im.bg};border:1px solid ${im.color}40">● ${im.label}</span>
+        ${F.required?'<span class="intent-badge" style="color:var(--red);background:rgba(248,81,73,.1);border:1px solid rgba(248,81,73,.2)">⚡ FRESHNESS CRITICAL</span>':''}
+        ${matchedTemplate?`<span class="intent-badge" style="color:var(--text-muted);background:var(--surface3);border:1px solid var(--border2)">${matchedTemplate.label}</span>`:''}
+      </div>
+      ${entities.length?`<div style="font-size:9px;color:var(--text-muted);margin-top:7px">entities: <span style="color:var(--text-dim)">${entities.slice(0,7).join(', ')}</span></div>`:''}
+    </div>
+
+    <!-- COMPOSED SCORES -->
+    <div style="font-size:9px;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px">Composed Dimension Scores</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:16px">
+      ${Object.entries({relevance:R.composed,credibility:C.composed,freshness:F.composed,depth:D.composed}).map(([k,v])=>{
+        const dm = DIM_META[k];
+        return `<div class="composed-card">
+          <div class="cc-label" style="color:${dm.color}">
+            <span style="width:5px;height:5px;border-radius:50%;background:${dm.color};display:inline-block;flex-shrink:0"></span>
+            ${dm.label}
+          </div>
+          <div class="cc-val" style="color:${dm.color}">${pct(v)}</div>
+          <div style="height:3px;background:var(--surface3);border-radius:2px;margin-top:7px;overflow:hidden">
+            <div style="height:100%;width:${pct(v)};background:${dm.color};border-radius:2px;transition:width .8s .1s"></div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+
+    <!-- D1: RELEVANCE -->
+    <div class="dim-section">
+      <div class="dim-header">
+        <span class="dim-tag" style="background:rgba(56,139,253,.1);color:var(--d-relevance)">D1 · Relevance</span>
+        <span class="dim-desc">how specific & matched must the content be</span>
+        <span class="dim-composed" style="color:var(--d-relevance)">${pct(R.composed)}</span>
+      </div>
+      ${sigRow('Semantic Match',       'keyword cosine sim vs. intent profiles',       R.semantic,      'var(--d-relevance)')}
+      ${sigRow('Entity Density',       'FB §3.1 entity linking · named tokens found',  R.entityDensity, 'var(--d-relevance)')}
+      ${sigRow('Specificity',          'narrow (high) vs. broad query (low)',           R.specificity,   'var(--d-relevance)')}
+      ${sigRow('Template Match Boost', 'FB §3.1 intent template · structural pattern', R.templateBoost, 'var(--d-relevance)', matchedTemplate?{text:matchedTemplate.label,color:'var(--text-dim)',bg:'var(--surface3)'}:null)}
+    </div>
+
+    <!-- D2: CREDIBILITY -->
+    <div class="dim-section">
+      <div class="dim-header">
+        <span class="dim-tag" style="background:rgba(210,153,34,.1);color:var(--d-credibility)">D2 · Credibility</span>
+        <span class="dim-desc">how authoritative the source must be</span>
+        <span class="dim-composed" style="color:var(--d-credibility)">${pct(C.composed)}</span>
+      </div>
+      ${sigRow('Stakes Level',      'decision-making vs. info-seeking',     C.stakes,        'var(--d-credibility)',
+        C.stakes.v>.80?{text:'HIGH',color:'#f85149',bg:'rgba(248,81,73,.12)'}:
+        C.stakes.v>.55?{text:'MED', color:'#d29922',bg:'rgba(210,153,34,.12)'}:
+        {text:'LOW',color:'#3fb950',bg:'rgba(63,185,80,.12)'})}
+      ${sigRow('Domain Sensitivity','medical / legal / financial',          C.sensitivity,   'var(--d-credibility)')}
+      ${sigRow('Corroboration',     'independent sources needed',           C.corroboration, 'var(--d-credibility)',
+        C.corroboration.v>.60?{text:`≥${sigs.minSources} sources`,color:'#d29922',bg:'rgba(210,153,34,.12)'}:
+        {text:'1 source',color:'var(--text-muted)',bg:'var(--surface3)'})}
+      ${sigRow('Controversy',       'multiple perspectives required',       C.controversy,   'var(--d-credibility)')}
+    </div>
+
+    <!-- D3: FRESHNESS -->
+    <div class="dim-section">
+      <div class="dim-header">
+        <span class="dim-tag" style="background:rgba(248,81,73,.1);color:var(--d-freshness)">D3 · Freshness</span>
+        <span class="dim-desc">how time-sensitive the content must be${F.required?' · <span style="color:var(--red)">max '+sigs.maxFreshnessHours+'h</span>':''}</span>
+        <span class="dim-composed" style="color:var(--d-freshness)">${pct(F.composed)}</span>
+      </div>
+      ${sigRow('Velocity / Trending', 'FB §3.1 trending detection · time keywords',  F.velocity,       'var(--d-freshness)',
+        F.velocity.v>=.90?{text:'REAL-TIME',color:'#f85149',bg:'rgba(248,81,73,.12)'}:
+        F.velocity.v>=.60?{text:'RECENT',   color:'#d29922',bg:'rgba(210,153,34,.12)'}:
+        {text:'ARCHIVAL',color:'var(--text-muted)',bg:'var(--surface3)'})}
+      ${sigRow('Temporal Markers',    'extracted time refs: today / Q1 / year',       F.temporalMarkers,'var(--d-freshness)',
+        F.timeMarkers.length?{text:F.timeMarkers[0],color:'var(--text-dim)',bg:'var(--surface3)'}:null)}
+      ${sigRow('Event Urgency',       'earnings / rate decision / IPO detected',       F.eventUrgency,   'var(--d-freshness)')}
+      ${sigRow('Decay Rate',          'how fast this topic type goes stale',           F.decayRate,      'var(--d-freshness)')}
+    </div>
+
+    <!-- D4: DEPTH -->
+    <div class="dim-section">
+      <div class="dim-header">
+        <span class="dim-tag" style="background:rgba(188,140,255,.1);color:var(--d-depth)">D4 · Depth</span>
+        <span class="dim-desc">novel · not in FB paper or vLLM router</span>
+        <span class="dim-composed" style="color:var(--d-depth)">${pct(D.composed)}</span>
+      </div>
+      ${sigRow('Query Complexity',    'analytical language + query length',            D.complexity,     'var(--d-depth)')}
+      ${sigRow('Answer Depth Req.',   'headline vs. deep-dive needed',                 D.depthRequired,  'var(--d-depth)')}
+      ${sigRow('Question Type',       'Broder 2002 taxonomy (cited in FB paper)',      D.questionType,   'var(--d-depth)',
+        {text:D.questionType.raw||'informational',color:'var(--text-dim)',bg:'var(--surface3)'})}
+      ${sigRow('Ambiguity / Hedge',   'multiple angles needed to resolve',             D.ambiguity,      'var(--d-depth)')}
+    </div>
+
+    <!-- SOURCE SCORING -->
+    <div style="font-size:9px;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px;display:flex;align-items:center;gap:7px">
+      Source Scoring
+      <span style="flex:1;height:1px;background:var(--border)"></span>
+      <span style="font-size:8px;font-weight:normal">hover price for estimation details</span>
+    </div>
+    <div id="srcCards">${srcCards}</div>
+  </div>`;
+
+  setTimeout(()=>{
+    document.querySelectorAll('.src-card').forEach(c=>setTimeout(()=>c.classList.add('vis'),30));
+  },80);
+}
+
+function fmt$(n){ return n>=1?'$'+n.toFixed(2):'$'+n.toFixed(3) }
+function fmtBig(n){
+  if(n>=1e9) return '$'+(n/1e9).toFixed(1)+'B';
+  if(n>=1e6) return '$'+(n/1e6).toFixed(1)+'M';
+  if(n>=1e3) return '$'+Math.round(n/1e3)+'K';
+  return '$'+Math.round(n);
+}
+
+function renderRight(res){
+  const {sigs, selected, smartCost, smartQ, naiveCost, naiveQ, savings, savingsPct} = res;
+  const dq = 500000;
+
+  const items = selected.map(s=>`
+    <div class="pi">
+      <div class="pi-name">${s.name}</div>
+      <div class="pi-util">${pct(s.utility)}</div>
+      <div class="pi-price">${s.price===0?'FREE':'$'+s.price.toFixed(2)}</div>
+    </div>`).join('');
+
+  document.getElementById('rightP').innerHTML = `
+  <div class="fade-in">
+    <div style="font-size:9px;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px">Cost Comparison</div>
+    <div class="metric-pair">
+      <div class="mc"><div class="mc-lbl">Naive (top-3 authority)</div>
+        <div class="mc-val" style="color:var(--red)">${fmt$(naiveCost)}</div>
+        <div class="mc-sub">${pct(naiveQ)} avg quality</div>
+      </div>
+      <div class="mc"><div class="mc-lbl">Optimized</div>
+        <div class="mc-val" style="color:var(--green)">${fmt$(smartCost)}</div>
+        <div class="mc-sub">${pct(smartQ)} avg quality</div>
+      </div>
+    </div>
+    <div class="mc">
+      <div class="mc-lbl">Per-query savings</div>
+      <div class="mc-val" style="color:var(--green)">${fmt$(savings)} <span style="font-size:13px">(${savingsPct.toFixed(0)}%)</span></div>
+      <div class="savings-wrap"><div class="savings-fill" style="width:${Math.min(savingsPct,100)}%"></div></div>
+    </div>
+
+    <div style="font-size:9px;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase;margin:12px 0 8px">Purchase Plan</div>
+    <div id="piList">${items||'<div style="font-size:10px;color:var(--text-muted);padding:6px 0">No paid sources needed — free sources sufficient</div>'}</div>
+
+    <div style="font-size:9px;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase;margin:12px 0 8px">Signal-Derived Thresholds</div>
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:4px 10px">
+      <div class="roi-row"><span class="rl">Quality floor</span><span class="rv">${pct(sigs.qualityThreshold)} <span style="color:var(--text-muted);font-size:9px">(from credibility)</span></span></div>
+      <div class="roi-row"><span class="rl">Max source age</span><span class="rv">${sigs.maxFreshnessHours>=9999?'unlimited':sigs.maxFreshnessHours+'h'} <span style="color:var(--text-muted);font-size:9px">(from freshness)</span></span></div>
+      <div class="roi-row"><span class="rl">Min sources</span><span class="rv">${sigs.minSources} <span style="color:var(--text-muted);font-size:9px">(from corroboration)</span></span></div>
+    </div>
+
+    <div style="font-size:9px;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase;margin:12px 0 8px">ROI at Scale</div>
+    <div class="roi-card">
+      <div class="roi-hdr">at 500K queries / day</div>
+      <div class="roi-row"><span class="rl">Daily savings</span><span class="rv">${fmtBig(savings*dq)}</span></div>
+      <div class="roi-row"><span class="rl">Monthly savings</span><span class="rv">${fmtBig(savings*dq*30)}</span></div>
+      <div class="roi-row"><span class="rl">Annual savings</span><span class="rv hi">${fmtBig(savings*dq*365)}</span></div>
+    </div>
+  </div>`;
+
+  setTimeout(()=>{
+    document.querySelectorAll('.pi').forEach(el=>setTimeout(()=>el.classList.add('vis'),50));
+  },100);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════
+
+function go(){
+  const q = document.getElementById('qi').value.trim();
+  if(!q){ document.getElementById('qi').focus(); return; }
+  const btn = document.getElementById('runBtn');
+  btn.textContent='⟳ Analyzing...'; btn.classList.add('loading');
+  document.getElementById('midDot').classList.add('on');
+  document.getElementById('rightDot').classList.add('on');
+  setTimeout(()=>{
+    const res = optimize(q);
+    renderMiddle(res); renderRight(res);
+    totalRuns++;
+    sumSavings += res.savingsPct;
+    document.getElementById('totalRuns').textContent = totalRuns;
+    document.getElementById('avgSavings').textContent = Math.round(sumSavings/totalRuns)+'%';
+    btn.textContent='▶ Optimize'; btn.classList.remove('loading');
+  }, 300);
+}
+
+function init(){
+  const chips = document.getElementById('chips');
+  SCENARIOS.forEach(s=>{
+    const d = document.createElement('div');
+    d.className='sc-chip';
+    d.innerHTML=`<div class="sc-tag">${s.tag}</div>${s.q}`;
+    d.onclick=()=>{ document.getElementById('qi').value=s.q; go(); };
+    chips.appendChild(d);
+  });
+  document.getElementById('qi').addEventListener('keydown',e=>{
+    if(e.key==='Enter'&&(e.metaKey||e.ctrlKey)) go();
+  });
+}
+
+init();
+</script>
+</body>
+</html>
