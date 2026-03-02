@@ -1,2 +1,6 @@
 flask
 gunicorn
+python-dotenv
+# Prefer ddgs for search (Python 3.9: use ddgs==9.0.x; 3.10+: any ddgs). Fallback: duckduckgo-search.
+ddgs
+duckduckgo-search

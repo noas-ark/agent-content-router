@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin · Learning &amp; Persistence</title>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0a0e12;
+      --surface: #0f1419;
+      --surface2: #161d26;
+      --border: #21262d;
+      --text: #c9d1d9;
+      --text-dim: #8b949e;
+      --text-muted: #484f58;
+      --admin-accent: #d4a574;
+      --admin-bg: rgba(212,165,116,.08);
+      --green: #3fb950;
+      --red: #f85149;
+      --yellow: #d29922;
+    }
+    *,*::before,*::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'IBM Plex Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      font-size: 13px;
+    }
+
+    /* Admin bar */
+    .admin-bar {
+      height: 48px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      gap: 12px;
+    }
+    .admin-bar .back {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      color: var(--text-dim);
+      text-decoration: none;
+      padding: 4px 10px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      transition: color .15s, border-color .15s;
+    }
+    .admin-bar .back:hover {
+      color: var(--text);
+      border-color: var(--text-muted);
+    }
+    .admin-bar .title {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: .06em;
+      color: var(--text-dim);
+    }
+    .admin-bar .badge {
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: .12em;
+      padding: 3px 8px;
+      background: var(--admin-bg);
+      color: var(--admin-accent);
+      border: 1px solid rgba(212,165,116,.25);
+      border-radius: 3px;
+      margin-left: auto;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 24px 20px;
+    }
+
+    .page-heading {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 10px;
+      letter-spacing: .15em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+    h1 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 24px;
+    }
+
+    /* Overview cards */
+    .overview {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 14px;
+      margin-bottom: 28px;
+    }
+    .card {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 16px;
+    }
+    .card .label {
+      font-size: 10px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+    .card .value {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 20px;
+      font-weight: 600;
+      color: var(--admin-accent);
+    }
+    .card .hint {
+      font-size: 10px;
+      color: var(--text-muted);
+      margin-top: 8px;
+      line-height: 1.4;
+    }
+
+    /* Section */
+    .section {
+      margin-bottom: 28px;
+    }
+    .section-title {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .section-title .refresh {
+      font-size: 10px;
+      padding: 4px 10px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text-dim);
+      cursor: pointer;
+      transition: color .15s, border-color .15s;
+    }
+    .section-title .refresh:hover {
+      color: var(--admin-accent);
+      border-color: var(--admin-accent);
+    }
+
+    /* Cluster block */
+    .cluster-block {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      margin-bottom: 14px;
+      overflow: hidden;
+    }
+    .cluster-name {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 10px 14px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      color: var(--admin-accent);
+    }
+    .cluster-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    .cluster-table th {
+      text-align: left;
+      padding: 8px 14px;
+      font-size: 9px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      font-weight: 600;
+      border-bottom: 1px solid var(--border);
+    }
+    .cluster-table td {
+      padding: 8px 14px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+    }
+    .cluster-table tr:last-child td { border-bottom: none; }
+    .cluster-table .num { font-family: 'IBM Plex Mono', monospace; text-align: right; }
+    .cluster-table .pct { color: var(--green); }
+    .cluster-table .pct.low { color: var(--red); }
+    .empty-state {
+      padding: 24px;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+    .error-state {
+      padding: 16px;
+      background: rgba(248,81,73,.08);
+      border: 1px solid rgba(248,81,73,.3);
+      border-radius: 6px;
+      color: var(--red);
+      font-size: 12px;
+      margin-bottom: 20px;
+    }
+    .loading { opacity: .6; pointer-events: none; }
+  </style>
+</head>
+<body>
+  <header class="admin-bar">
+    <a class="back" href="/">← Back to Optimizer</a>
+    <span class="title">Learning &amp; Persistence</span>
+    <span class="badge">Admin</span>
+  </header>
+
+  <main class="container">
+    <p class="page-heading">Internal use only</p>
+    <h1>Learning system &amp; persistence</h1>
+    <p style="color: var(--text-dim); font-size: 12px; margin-bottom: 24px; max-width: 560px;">
+      This dashboard shows how the optimizer is learning which publishers deliver value for which query types. Data is persisted in SQLite; aggregates use k-anonymity and optional differential privacy.
+    </p>
+
+    <div class="overview" id="overview">
+      <div class="card">
+        <div class="label">Events logged</div>
+        <div class="value" id="event-count">—</div>
+        <div class="hint">Total conversion events (each /optimize call)</div>
+      </div>
+      <div class="card">
+        <div class="label">Min sample size</div>
+        <div class="value" id="min-sample">—</div>
+        <div class="hint">K-anonymity: stats only shown when N ≥ this</div>
+      </div>
+      <div class="card">
+        <div class="label">Clusters with data</div>
+        <div class="value" id="cluster-count">—</div>
+        <div class="hint">Query intents that have enough events</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">
+        Learned publisher performance (by query cluster)
+        <button type="button" class="refresh" id="refresh">Refresh</button>
+      </div>
+      <div id="error" class="error-state" style="display: none;"></div>
+      <div id="learned-content"></div>
+    </div>
+  </main>
+
+  <script>
+    const learnedContent = document.getElementById('learned-content');
+    const errorEl = document.getElementById('error');
+    const refreshBtn = document.getElementById('refresh');
+
+    function showError(msg) {
+      errorEl.textContent = msg;
+      errorEl.style.display = 'block';
+    }
+    function clearError() {
+      errorEl.style.display = 'none';
+    }
+
+    function renderLearned(data) {
+      document.getElementById('event-count').textContent = data.event_count ?? '—';
+      document.getElementById('min-sample').textContent = data.min_sample_size ?? '—';
+      const byCluster = data.by_cluster || {};
+      const clusterNames = Object.keys(byCluster);
+      document.getElementById('cluster-count').textContent = clusterNames.length;
+
+      if (clusterNames.length === 0) {
+        learnedContent.innerHTML = '<div class="empty-state">No learned stats yet. Run optimizations and submit feedback (POST /feedback) until sample size reaches the minimum per cluster/publisher.</div>';
+        return;
+      }
+
+      let html = '';
+      for (const cluster of clusterNames.sort()) {
+        const publishers = byCluster[cluster];
+        const rows = Object.entries(publishers).map(([pub, s]) => ({
+          publisher: pub,
+          purchase_count: s.purchase_count,
+          citation_count: s.citation_count,
+          citation_rate: s.citation_rate,
+          avg_quality: s.avg_quality,
+          avg_cost: s.avg_cost,
+          value_per_dollar: s.value_per_dollar,
+        }));
+        rows.sort((a, b) => (b.citation_rate || 0) - (a.citation_rate || 0));
+        html += '<div class="cluster-block">';
+        html += '<div class="cluster-name">' + escapeHtml(cluster) + '</div>';
+        html += '<table class="cluster-table"><thead><tr>';
+        html += '<th>Publisher</th><th class="num">Purchases</th><th class="num">Cited</th><th class="num">Citation rate</th><th class="num">Avg quality</th><th class="num">Value/$</th></tr></thead><tbody>';
+        for (const r of rows) {
+          const rateClass = r.citation_rate >= 0.6 ? 'pct' : (r.citation_rate > 0 ? 'pct low' : '');
+          const rateStr = (r.citation_rate * 100).toFixed(1) + '%';
+          const qualityStr = (r.avg_quality * 100).toFixed(1) + '%';
+          const vpdStr = r.value_per_dollar != null ? r.value_per_dollar.toFixed(3) : '—';
+          html += '<tr><td>' + escapeHtml(r.publisher) + '</td><td class="num">' + r.purchase_count + '</td><td class="num">' + r.citation_count + '</td><td class="num ' + rateClass + '">' + rateStr + '</td><td class="num">' + qualityStr + '</td><td class="num">' + vpdStr + '</td></tr>';
+        }
+        html += '</tbody></table></div>';
+      }
+      learnedContent.innerHTML = html;
+    }
+
+    function escapeHtml(s) {
+      const div = document.createElement('div');
+      div.textContent = s;
+      return div.innerHTML;
+    }
+
+    async function load() {
+      clearError();
+      refreshBtn.classList.add('loading');
+      try {
+        const r = await fetch('/learn?min_sample_size=1');
+        if (!r.ok) throw new Error(r.status + ' ' + r.statusText);
+        const data = await r.json();
+        renderLearned(data);
+      } catch (e) {
+        showError('Failed to load: ' + e.message);
+        learnedContent.innerHTML = '';
+      } finally {
+        refreshBtn.classList.remove('loading');
+      }
+    }
+
+    refreshBtn.addEventListener('click', load);
+    load();
+  </script>
+</body>
+</html>

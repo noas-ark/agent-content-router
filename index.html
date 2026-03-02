@@ -31,6 +31,19 @@
   .tbar-stat span{color:var(--accent);font-weight:500}
   .ml-auto{margin-left:auto}
   .pulse-dot{width:5px;height:5px;border-radius:50%;background:var(--accent);animation:pulse 2s infinite}
+  .topbar a.admin-link{font-size:10px;color:var(--text-muted);text-decoration:none;letter-spacing:.06em;padding:4px 8px;border-radius:4px;transition:color .15s,background .15s}
+  .topbar a.admin-link:hover{color:var(--text-dim);background:var(--surface2)}
+  .query-breakdown{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:12px 14px;margin-bottom:16px}
+  .query-breakdown .qb-title{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-muted);margin-bottom:10px;display:flex;align-items:center;gap:6px}
+  .query-breakdown .qb-title span:last-child{font-size:8px;font-weight:normal;color:var(--text-muted);opacity:.9}
+  .query-breakdown .qb-row{display:flex;align-items:baseline;gap:8px;margin-bottom:6px;font-size:10px}
+  .query-breakdown .qb-row:last-child{margin-bottom:0}
+  .query-breakdown .qb-k{color:var(--text-muted);min-width:120px;flex-shrink:0}
+  .query-breakdown .qb-v{color:var(--text);word-break:break-word}
+  .query-breakdown .qb-chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+  .query-breakdown .qb-chip{font-size:9px;padding:2px 6px;background:var(--surface3);border:1px solid var(--border2);border-radius:3px;color:var(--text-dim)}
+  .query-breakdown .qb-chip.trending{color:var(--yellow);border-color:rgba(210,153,34,.3);background:rgba(210,153,34,.08)}
+  .query-breakdown .qb-intent-list{color:var(--text-dim);font-size:10px;line-height:1.5}
 
   /* LAYOUT */
   .main{flex:1;display:grid;grid-template-columns:280px 1fr 320px;overflow:hidden}
@@ -172,6 +185,18 @@
   .st::after{content:'';flex:1;height:1px;background:var(--border)}
   .empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:10px;color:var(--text-muted);font-size:10px;text-align:center;padding:20px}
   .empty-icon{font-size:28px;opacity:.25;margin-bottom:3px}
+  .optimize-loading{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:14px;color:var(--text-muted);font-size:10px;text-align:center;padding:20px}
+  .optimize-loading .ol-spinner{width:28px;height:28px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+  .optimize-loading .ol-text{letter-spacing:.06em;opacity:.9}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  .article-card{border:1px solid var(--border);border-radius:5px;padding:10px 12px;margin-bottom:8px;background:var(--surface2)}
+  .article-card:last-child{margin-bottom:0}
+  .article-card a{color:var(--accent);text-decoration:none;font-size:11px;line-height:1.35;display:block;margin-bottom:4px}
+  .article-card a:hover{text-decoration:underline}
+  .article-card .art-meta{font-size:9px;color:var(--text-muted);display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px}
+  .article-card .art-snippet{font-size:9px;color:var(--text-dim);line-height:1.4;margin-top:6px}
+  .search-unconfigured{font-size:9px;color:var(--text-muted);background:var(--surface2);border:1px dashed var(--border);border-radius:5px;padding:10px;margin-top:8px}
 
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
   @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
@@ -195,6 +220,8 @@
   <span style="font-size:10px;color:var(--text-dim);letter-spacing:.06em">Signal Lab</span>
   <span class="badge">v0.3</span>
   <div class="ml-auto" style="display:flex;align-items:center;gap:14px">
+    <a href="/admin" class="admin-link">Admin</a>
+    <div class="sep"></div>
     <div class="tbar-stat">runs <span id="totalRuns">0</span></div>
     <div class="tbar-stat">avg saved <span id="avgSavings">—</span></div>
     <div class="sep"></div>
@@ -504,6 +531,30 @@ function renderMiddle(res){
       }).join('')}
     </div>
 
+    ${(function(){
+      const qu = sigs.queryUnderstanding;
+      if (!qu) return '';
+      const pi = qu.purchase_intent || {};
+      const entities = qu.entity_linking || [];
+      const rules = qu.routing_rules_fired || [];
+      return `
+    <!-- Query Understanding (FB paper §3.1 style) -->
+    <div class="query-breakdown">
+      <div class="qb-title">Query breakdown <span>· intent → routing → tier</span></div>
+      <div class="qb-row"><span class="qb-k">Content type</span><span class="qb-v">${pi.content_type_needed || '—'}</span></div>
+      <div class="qb-row"><span class="qb-k">Topical domain</span><span class="qb-v">${pi.topical_domain || '—'}</span></div>
+      <div class="qb-row"><span class="qb-k">Freshness need</span><span class="qb-v">${pi.freshness_requirement || '—'}</span></div>
+      <div class="qb-row"><span class="qb-k">Quality floor</span><span class="qb-v">${(pi.quality_threshold != null ? (pi.quality_threshold * 100).toFixed(0) + '%' : '—')}</span></div>
+      <div class="qb-row"><span class="qb-k">Entity linking</span><span class="qb-v">${entities.length ? entities.slice(0,8).join(', ') + (entities.length > 8 ? ' …' : '') : '—'}</span></div>
+      <div class="qb-row"><span class="qb-k">Intent template</span><span class="qb-v">${qu.intent_template || '—'}</span></div>
+      <div class="qb-row"><span class="qb-k">Trending signal</span><span class="qb-v">${qu.trending_signal ? 'yes' : 'no'}</span></div>
+      <div class="qb-row"><span class="qb-k">Query cluster</span><span class="qb-v" style="font-family:'IBM Plex Mono',monospace;font-size:9px">${qu.query_cluster || '—'}</span></div>
+      <div class="qb-row"><span class="qb-k">Tier strategy</span><span class="qb-v">${qu.tier_strategy || '—'}</span></div>
+      ${rules.length ? `<div class="qb-row"><span class="qb-k">Routing rules</span><div class="qb-v"><div class="qb-chips">${rules.map(r=>'<span class="qb-chip">'+r+'</span>').join('')}</div></div></div>` : ''}
+    </div>
+    `;
+    })()}
+
     <!-- D1: RELEVANCE -->
     <div class="dim-section">
       <div class="dim-header">
@@ -580,6 +631,12 @@ function renderMiddle(res){
   },80);
 }
 
+function escapeHtml(s){
+  if (s == null) return '';
+  const div = document.createElement('div');
+  div.textContent = s;
+  return div.innerHTML;
+}
 function fmt$(n){ return n>=1?'$'+n.toFixed(2):'$'+n.toFixed(3) }
 function fmtBig(n){
   if(n>=1e9) return '$'+(n/1e9).toFixed(1)+'B';
@@ -589,8 +646,9 @@ function fmtBig(n){
 }
 
 function renderRight(res){
-  const {sigs, selected, smartCost, smartQ, naiveCost, naiveQ, savings, savingsPct} = res;
+  const {sigs, selected, smartCost, smartQ, naiveCost, naiveQ, savings, savingsPct, selected_articles, search_configured, search_provider} = res;
   const dq = 500000;
+  const articles = selected_articles || [];
 
   const items = selected.map(s=>`
     <div class="pi">
@@ -598,6 +656,19 @@ function renderRight(res){
       <div class="pi-util">${pct(s.utility)}</div>
       <div class="pi-price">${s.price===0?'FREE':'$'+s.price.toFixed(2)}</div>
     </div>`).join('');
+
+  const articlesHtml = articles.length
+    ? articles.map(a=>`
+        <div class="article-card">
+          <a href="${a.url}" target="_blank" rel="noopener">${escapeHtml(a.title)}</a>
+          <div class="art-meta"><span>${escapeHtml(a.source_name)}</span><span>${a.price===0?'FREE':a.price!=null?'$'+a.price.toFixed(2):'—'}</span></div>
+          ${a.snippet ? `<div class="art-snippet">${escapeHtml(a.snippet)}</div>` : ''}
+        </div>`).join('')
+    : (search_configured ? '<div style="font-size:10px;color:var(--text-muted);padding:6px 0">No search results for this query. Try a different query or check the search provider.</div>' : '');
+
+  const searchNote = !search_configured
+    ? '<div class="search-unconfigured">Using DuckDuckGo. Set <code>BRAVE_API_KEY</code> or <code>GOOGLE_CSE_API_KEY</code> + <code>GOOGLE_CSE_CX</code> in .env to use another provider.</div>'
+    : '';
 
   document.getElementById('rightP').innerHTML = `
   <div class="fade-in">
@@ -620,6 +691,10 @@ function renderRight(res){
 
     <div style="font-size:9px;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase;margin:12px 0 8px">Purchase Plan</div>
     <div id="piList">${items||'<div style="font-size:10px;color:var(--text-muted);padding:6px 0">No paid sources needed — free sources sufficient</div>'}</div>
+
+    <div style="font-size:9px;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase;margin:12px 0 8px">Articles to scrape${search_provider ? ' <span style="font-weight:normal;color:var(--text-dim)">(via ' + search_provider + ')</span>' : ''}</div>
+    <div id="articleList">${articlesHtml}</div>
+    ${searchNote}
 
     <div style="font-size:9px;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase;margin:12px 0 8px">Signal-Derived Thresholds</div>
     <div style="background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:4px 10px">
@@ -646,13 +721,34 @@ function renderRight(res){
 // INIT
 // ═══════════════════════════════════════════════════════════════
 
+const MIN_OPTIMIZE_DISPLAY_DELAY_MS = 1200;
+
+function showOptimizeLoading(){
+  document.getElementById('midP').innerHTML = `
+    <div class="optimize-loading">
+      <div class="ol-spinner"></div>
+      <div class="ol-text">Analyzing query…</div>
+      <div style="font-size:9px;opacity:.6">extracting signals · scoring sources</div>
+    </div>`;
+  document.getElementById('rightP').innerHTML = `
+    <div class="optimize-loading">
+      <div class="ol-spinner"></div>
+      <div class="ol-text">Computing purchase plan…</div>
+      <div style="font-size:9px;opacity:.6">optimizing for quality vs cost</div>
+    </div>`;
+}
+
 async function go(){
   const q = document.getElementById('qi').value.trim();
   if(!q){ document.getElementById('qi').focus(); return; }
   const btn = document.getElementById('runBtn');
-  btn.textContent='⟳ Analyzing...'; btn.classList.add('loading');
+  btn.textContent = '⟳ Analyzing…';
+  btn.classList.add('loading');
+  btn.disabled = true;
   document.getElementById('midDot').classList.add('on');
   document.getElementById('rightDot').classList.add('on');
+  showOptimizeLoading();
+  const startedAt = Date.now();
   try {
     const resp = await fetch('/optimize', {
       method: 'POST',
@@ -660,14 +756,20 @@ async function go(){
       body: JSON.stringify({query: q})
     });
     const res = await resp.json();
-    renderMiddle(res); renderRight(res);
+    const elapsed = Date.now() - startedAt;
+    const wait = Math.max(0, MIN_OPTIMIZE_DISPLAY_DELAY_MS - elapsed);
+    await new Promise(r => setTimeout(r, wait));
+    renderMiddle(res);
+    renderRight(res);
     totalRuns++;
     sumSavings += res.savingsPct;
     document.getElementById('totalRuns').textContent = totalRuns;
     document.getElementById('avgSavings').textContent = Math.round(sumSavings/totalRuns)+'%';
   } catch(err) { console.error(err); }
   finally {
-    btn.textContent='▶ Optimize'; btn.classList.remove('loading');
+    btn.textContent = '▶ Optimize';
+    btn.classList.remove('loading');
+    btn.disabled = false;
   }
 }
 

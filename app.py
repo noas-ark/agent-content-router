@@ -1,6 +1,15 @@
 import math
 import re
+import uuid
+from urllib.parse import urlparse
+
+from dotenv import load_dotenv
+load_dotenv()
+
 from flask import Flask, request, jsonify, send_from_directory
+
+from learning import ConversionEvent, get_metrics_store
+from search_provider import fetch_search_results, is_search_configured, get_search_provider_name
 
 app = Flask(__name__)
 
@@ -9,27 +18,36 @@ app = Flask(__name__)
 # ═══════════════════════════════════════════════════════════════
 
 SOURCES = [
-    {"name": "Bloomberg",       "price": 3.00, "auth": .95, "topics": ["finance","economics","markets"],   "freshH": 2,  "type": "premium",
+    {"name": "Bloomberg",       "price": 3.00, "auth": .95, "topics": ["finance","economics","markets"],   "freshH": 2,  "type": "premium", "domains": ["bloomberg.com", "www.bloomberg.com"],
      "priceSource": "Cloudflare Pay-Per-Crawl",    "priceDetail": "Bloomberg registered with Cloudflare's pay-per-crawl program. 402 response header returns crawler-price: 3.00 USD. Premium financial content, single-article access."},
-    {"name": "WSJ",             "price": 2.50, "auth": .93, "topics": ["finance","business","politics"],   "freshH": 4,  "type": "premium",
+    {"name": "WSJ",             "price": 2.50, "auth": .93, "topics": ["finance","business","politics"],   "freshH": 4,  "type": "premium", "domains": ["wsj.com", "www.wsj.com"],
      "priceSource": "TollBit registered publisher", "priceDetail": "WSJ is listed in TollBit's publisher catalog at $2.50/article. Pricing verified against TollBit's public rate card. WSJ also has a Microsoft PCM deal but per-article access is TollBit-routed."},
-    {"name": "Financial Times", "price": 3.50, "auth": .94, "topics": ["finance","geopolitics","trade"],   "freshH": 3,  "type": "premium",
+    {"name": "Financial Times", "price": 3.50, "auth": .94, "topics": ["finance","geopolitics","trade"],   "freshH": 3,  "type": "premium", "domains": ["ft.com", "www.ft.com"],
      "priceSource": "RSL license + TollBit",        "priceDetail": "FT publishes RSL terms at ft.com/robots.txt pointing to rsl-license.xml. Pay-per-crawl rate set at $3.50, classified as premium analysis. TollBit acts as merchant of record."},
-    {"name": "Reuters",         "price": 0.80, "auth": .88, "topics": ["news","finance","breaking"],       "freshH": 1,  "type": "wire",
+    {"name": "Reuters",         "price": 0.80, "auth": .88, "topics": ["news","finance","breaking"],       "freshH": 1,  "type": "wire", "domains": ["reuters.com", "www.reuters.com"],
      "priceSource": "TollBit wire tier",            "priceDetail": "Reuters wire content is priced at the budget tier on TollBit — high volume, fast-turnover news. 402 response includes crawler-price: 0.80. Lower price reflects commodity wire distribution model."},
-    {"name": "AP",              "price": 0.70, "auth": .87, "topics": ["news","general","breaking"],       "freshH": 1,  "type": "wire",
+    {"name": "AP",              "price": 0.70, "auth": .87, "topics": ["news","general","breaking"],       "freshH": 1,  "type": "wire", "domains": ["apnews.com", "www.apnews.com"],
      "priceSource": "Cloudflare Pay-Per-Crawl",    "priceDetail": "AP uses Cloudflare's AI Crawl Control. 402 header: crawler-price: 0.70 USD. Slightly cheaper than Reuters; AP distributes syndicated wire broadly and prices for volume AI access."},
-    {"name": "NYT",             "price": 1.50, "auth": .91, "topics": ["news","politics","culture"],       "freshH": 6,  "type": "mid",
+    {"name": "NYT",             "price": 1.50, "auth": .91, "topics": ["news","politics","culture"],       "freshH": 6,  "type": "mid", "domains": ["nytimes.com", "www.nytimes.com"],
      "priceSource": "Microsoft PCM",               "priceDetail": "NYT is a launch partner in Microsoft's Publisher Content Marketplace (PCM). Usage-based pricing at ~$1.50/article for AI assistant access. PCM handles identity verification (KYA) and settlement via Stripe."},
-    {"name": "TechCrunch",      "price": 0.50, "auth": .82, "topics": ["tech","startups","AI"],            "freshH": 3,  "type": "mid",
+    {"name": "TechCrunch",      "price": 0.50, "auth": .82, "topics": ["tech","startups","AI"],            "freshH": 3,  "type": "mid", "domains": ["techcrunch.com", "www.techcrunch.com"],
      "priceSource": "TollBit mid-tier",            "priceDetail": "TechCrunch is in TollBit's standard publisher catalog. Mid-tier price at $0.50. Content is high-volume, topically specific (tech). 402 response negotiated via TollBit's bot authentication layer."},
-    {"name": "Brookings",       "price": 0.00, "auth": .89, "topics": ["policy","research","economics"],   "freshH": 72, "type": "free",
+    {"name": "Brookings",       "price": 0.00, "auth": .89, "topics": ["policy","research","economics"],   "freshH": 72, "type": "free", "domains": ["brookings.edu", "www.brookings.edu"],
      "priceSource": "Open access / no paywall",    "priceDetail": "Brookings Institution publishes all content under open access. No robots.txt restriction on AI crawling. No RSL license required. Free to access — but no freshness guarantee and no 402 flow."},
-    {"name": "arXiv",           "price": 0.00, "auth": .87, "topics": ["science","AI","engineering"],      "freshH": 24, "type": "free",
+    {"name": "arXiv",           "price": 0.00, "auth": .87, "topics": ["science","AI","engineering"],      "freshH": 24, "type": "free", "domains": ["arxiv.org"],
      "priceSource": "Open access (Cornell)",       "priceDetail": "arXiv is operated by Cornell University with a fully open-access mandate. All preprints are freely crawlable. No TollBit, no 402, no RSL. High authority for technical queries but no editorial curation or breaking news."},
-    {"name": "Wikipedia",       "price": 0.00, "auth": .75, "topics": ["general","reference","history"],   "freshH": 168,"type": "free",
+    {"name": "Wikipedia",       "price": 0.00, "auth": .75, "topics": ["general","reference","history"],   "freshH": 168,"type": "free", "domains": ["wikipedia.org", "en.wikipedia.org"],
      "priceSource": "CC BY-SA license",            "priceDetail": "Wikipedia content is licensed under Creative Commons Attribution-ShareAlike. Freely crawlable and trainable with attribution. No paywall, no 402 response. Lowest freshness of all sources (weekly update cycle)."},
 ]
+
+# Map search result hostname -> source dict (for matching real articles to our catalog)
+def _build_domain_to_source():
+    out = {}
+    for s in SOURCES:
+        for d in s.get("domains", []):
+            out[d.lower()] = s
+    return out
+DOMAIN_TO_SOURCE = _build_domain_to_source()
 
 DOMAIN_BOOST = {
     "financial_analysis": {"Bloomberg": .32, "WSJ": .24, "Financial Times": .28, "Reuters": .12},
@@ -41,6 +59,57 @@ DOMAIN_BOOST = {
 }
 
 REDUNDANT = [["Reuters", "AP"], ["Bloomberg", "Reuters"]]
+
+
+def _host_from_url(link: str) -> str:
+    try:
+        host = (urlparse(link).netloc or "").lower()
+        return host[4:] if host.startswith("www.") else host
+    except Exception:
+        return ""
+
+
+def _domain_to_label(host: str) -> str:
+    """Turn host like bbc.com into a short label (e.g. BBC)."""
+    if not host:
+        return "Other"
+    # strip www and take first part
+    base = host.split(".")[0] if host else "other"
+    return base.upper() if len(base) <= 5 else base.capitalize()
+
+
+def _search_results_to_articles(search_results: list) -> list:
+    """
+    Which articles are shown: every search result is shown as an article to scrape.
+    - No filtering by "selected" purchase plan; we show all results from the search provider.
+    - For each result: if its domain is in our catalog (DOMAIN_TO_SOURCE), we show that
+      source's name and price; otherwise we show a short domain label (e.g. BBC, CNN) and no price (—).
+    """
+    if not isinstance(search_results, list):
+        return []
+    out = []
+    for r in search_results:
+        if not isinstance(r, dict):
+            continue
+        link = (r.get("link") or r.get("url") or r.get("href") or "").strip()
+        host = _host_from_url(link)
+        if not link:
+            continue
+        src = DOMAIN_TO_SOURCE.get(host) if host else None
+        if src:
+            source_name, price = src["name"], src["price"]
+        else:
+            source_name = _domain_to_label(host) if host else "Other"
+            price = None
+        out.append({
+            "title": (r.get("title") or "").strip() or "(No title)",
+            "url": link,
+            "source_name": source_name,
+            "price": price,
+            "snippet": (r.get("snippet") or "").strip(),
+        })
+    return out
+
 
 # ═══════════════════════════════════════════════════════════════
 # SCORING LOGIC
@@ -72,6 +141,13 @@ def extract_signals(query):
     sorted_intents = sorted(intent_scores.items(), key=lambda x: -x[1])
     intent = sorted_intents[0][0]
     top_intent_score = sorted_intents[0][1]
+    # "What happened in X" / entity-heavy ambiguous -> prefer news/wire
+    has_entity = bool(re.search(r"\b[A-Z][a-z]{2,}\b", query))
+    what_happened = bool(re.search(r"\bwhat('s|\s+is|\s+happened|\s+happening)\b", q))
+    # Override: (1) "what happened/happening" implies news even with lowercase "iran"; (2) ambiguous + entity
+    if what_happened or (top_intent_score < 0.12 and has_entity):
+        intent = "breaking_news"
+        top_intent_score = 0.5
     semantic_raw = min(top_intent_score * 3.8 + 0.22, 0.98)
 
     # ── DIMENSION 1: RELEVANCE ────────────────────────────────
@@ -220,7 +296,78 @@ def extract_signals(query):
     quality_threshold = min(0.60 + credibility_composed*0.30 + depth_composed*0.08, 0.96)
     min_sources = 2 if corroboration_raw > 0.60 else 1
 
+    # ── Facebook-paper style: Query Understanding Stack (Fig 3) ──
+    # Content type needed (purchase intent)
+    content_type_map = {
+        "breaking_news": "real-time news",
+        "financial_analysis": "analysis + data",
+        "tech_product": "product/review content",
+        "explainer": "background / reference",
+        "policy": "policy / regulatory",
+        "medical_clinical": "clinical / medical",
+    }
+    freshness_requirement = (
+        "real-time" if velocity_raw >= 0.9 else
+        "24h" if velocity_raw >= 0.6 else
+        "7days" if velocity_raw >= 0.3 else "evergreen"
+    )
+    topical_domain = intent.replace("_", " ")  # intent doubles as primary domain
+    if "tariff" in q or "trade" in q or "geopolit" in q or "policy" in q:
+        topical_domain = topical_domain + " + geopolitics"
+    if re.search(r"\b(earnings|revenue|profit|q[1-4])\b", q):
+        topical_domain = topical_domain + " + earnings"
+
+    # Trending detection (FB §3.1): heuristic = breaking + real-time
+    trending_signal = intent == "breaking_news" and velocity_raw >= 0.9
+
+    # Query cluster: richer segment for routing/learning (e.g. financial_earnings_geopolitical)
+    cluster_parts = [intent]
+    if matched_template and matched_template.get("label"):
+        cluster_parts.append(matched_template["label"].replace("<", "").replace(">", "").replace("_", ""))
+    if controversy_triggered:
+        cluster_parts.append("multi_perspective")
+    query_cluster = "_".join(cluster_parts)[:48]
+
+    # Routing rules fired (decision flow that drives tier/source selection)
+    routing_rules_fired = []
+    if freshness_required and velocity_raw >= 0.9:
+        routing_rules_fired.append("premium_real_time")
+    if corroboration_raw > 0.60:
+        routing_rules_fired.append("corroboration_required")
+    if credibility_composed > 0.75:
+        routing_rules_fired.append("authoritative_required")
+    if intent in ("financial_analysis", "medical_clinical", "policy") and sensitivity_raw > 0.5:
+        routing_rules_fired.append("domain_specialist_preferred")
+    if not freshness_required and velocity_raw < 0.4:
+        routing_rules_fired.append("free_first_ok")
+    if depth_required > 0.7:
+        routing_rules_fired.append("depth_required")
+
+    # Tier strategy (which content tiers we consider)
+    if quality_threshold >= 0.88 and (freshness_required or intent in ("financial_analysis", "medical_clinical")):
+        tier_strategy = "premium_required"
+    elif not freshness_required and quality_threshold < 0.75:
+        tier_strategy = "free_first_then_mid"
+    else:
+        tier_strategy = "balanced_premium_and_mid"
+
+    query_understanding = {
+        "purchase_intent": {
+            "content_type_needed": content_type_map.get(intent, intent),
+            "topical_domain": topical_domain.strip(),
+            "freshness_requirement": freshness_requirement,
+            "quality_threshold": round(quality_threshold, 3),
+        },
+        "entity_linking": entities,
+        "intent_template": matched_template["label"] if matched_template else None,
+        "trending_signal": trending_signal,
+        "query_cluster": query_cluster,
+        "routing_rules_fired": routing_rules_fired,
+        "tier_strategy": tier_strategy,
+    }
+
     return {
+        "queryUnderstanding": query_understanding,
         "intent":          intent,
         "intentScores":    intent_scores,
         "entities":        entities,
@@ -274,7 +421,7 @@ def extract_signals(query):
     }
 
 
-def score_source(sigs, src):
+def score_source(sigs, src, learned_boost=None):
     intent     = sigs["intent"]
     freshness  = sigs["freshness"]
     credibility = sigs["credibility"]
@@ -300,7 +447,10 @@ def score_source(sigs, src):
     if freshness["required"] and src["price"] == 0:
         f_fit *= 0.25
 
+    # Blend static domain boost with learned publisher performance (citation rate / value)
     boost = DOMAIN_BOOST.get(intent, {}).get(src["name"], 0)
+    if learned_boost:
+        boost = min(0.98, boost + learned_boost.get(src["name"], 0))
     q_fit = (
         {"premium": 1.0, "mid": 0.82, "wire": 0.76, "free": 0.52}.get(src["type"], 0.6)
         if credibility["composed"] > 0.70
@@ -318,19 +468,27 @@ def score_source(sigs, src):
     }
 
 
-def optimize(query):
+def optimize(query, customer_id="default"):
     sigs   = extract_signals(query)
     budget = 12.0
 
-    scored = [{**s, **score_source(sigs, s)} for s in SOURCES]
+    # Learned publisher performance for this intent (citation rate / value per dollar)
+    store = get_metrics_store()
+    learned_boost = store.get_learned_domain_boost(sigs["intent"])
+
+    scored = [{**s, **score_source(sigs, s, learned_boost)} for s in SOURCES]
 
     # GATE 1: Eligibility (hard filters)
     eligible, ineligible = [], []
+    intent = sigs["intent"]
     for s in scored:
         reasons = []
         if s["freshH"] > sigs["maxFreshnessHours"]:
             reasons.append("too_stale")
         if s["utility"] < sigs["qualityThreshold"] - 0.12:
+            reasons.append("low_utility")
+        # breaking_news: require topic overlap with news/current events (exclude tech/academic-only)
+        if intent == "breaking_news" and s.get("semantic", 0) < 0.35:
             reasons.append("low_utility")
         if reasons:
             ineligible.append({**s, "reason": reasons[0]})
@@ -385,6 +543,7 @@ def optimize(query):
         "naiveQ":     naive_q,
         "savings":    naive_cost - spent,
         "savingsPct": (naive_cost - spent) / naive_cost * 100 if naive_cost > 0 else 0,
+        "customer_id": customer_id,
     }
 
 
@@ -397,13 +556,107 @@ def index():
     return send_from_directory(".", "index.html")
 
 
+@app.route("/admin")
+def admin():
+    """Admin dashboard: learning system and persistence (internal use)."""
+    return send_from_directory(".", "admin.html")
+
+
 @app.route("/optimize", methods=["POST"])
 def optimize_route():
-    data  = request.get_json()
+    data = request.get_json() or {}
     query = data.get("query", "")
-    result = optimize(query)
+    customer_id = data.get("customer_id", "default")
+    result = optimize(query, customer_id=customer_id)
+
+    # Articles to scrape: show every search result (no filter by purchase plan).
+    # Each result is turned into an article; catalog domains get name+price, others get domain label + "—".
+    result["search_configured"] = is_search_configured()
+    result["search_provider"] = get_search_provider_name()
+    result["selected_articles"] = []
+    if is_search_configured():
+        try:
+            search_results, provider_used = fetch_search_results(query, num=15)
+            result["selected_articles"] = _search_results_to_articles(search_results)
+            result["search_provider"] = provider_used
+            if not result["selected_articles"] and search_results:
+                app.logger.warning(
+                    "Search returned %s results but 0 articles (query %r). First result keys: %s",
+                    len(search_results), query[:40], list(search_results[0].keys()) if search_results else None,
+                )
+            elif not result["selected_articles"]:
+                app.logger.info(
+                    "Search returned 0 results for %r (provider %s). Tip: set BRAVE_API_KEY in .env for reliable search.",
+                    query[:40], provider_used,
+                )
+        except Exception as e:
+            app.logger.warning("Search failed for %r: %s", query[:50], e)
+
+    # Persist conversion event for learning (purchase decision; outcomes via /feedback)
+    event_id = str(uuid.uuid4())
+    query_id = str(uuid.uuid4())
+    selected_names = [s["name"] for s in result["selected"]]
+    avg_confidence = sum(s.get("utility", 0) for s in result["selected"]) / len(result["selected"]) if result["selected"] else 0
+    qu = result["sigs"].get("queryUnderstanding") or {}
+    event = ConversionEvent(
+        event_id=event_id,
+        query_id=query_id,
+        customer_id=customer_id,
+        query_text=query,
+        query_cluster=qu.get("query_cluster") or result["sigs"]["intent"],
+        intent=result["sigs"]["intent"],
+        sources_purchased=selected_names,
+        total_cost=result["smartCost"],
+        decision_confidence=round(avg_confidence, 4),
+    )
+    get_metrics_store().log_event(event)
+    result["event_id"] = event_id
+    result["query_id"] = query_id
+
     return jsonify(result)
 
 
+@app.route("/feedback", methods=["POST"])
+def feedback_route():
+    """Submit outcome feedback for a prior optimization (sources cited, quality, correction)."""
+    data = request.get_json() or {}
+    event_id = data.get("event_id")
+    if not event_id:
+        return jsonify({"ok": False, "error": "event_id required"}), 400
+    sources_cited = data.get("sources_cited", [])
+    answer_quality = data.get("answer_quality")
+    user_rating = data.get("user_rating")
+    correction_made = data.get("correction_made", False)
+    ok = get_metrics_store().submit_feedback(
+        event_id=event_id,
+        sources_cited=sources_cited,
+        answer_quality=answer_quality,
+        user_rating=user_rating,
+        correction_made=correction_made,
+    )
+    if not ok:
+        return jsonify({"ok": False, "error": "event_id not found"}), 404
+    return jsonify({"ok": True})
+
+
+@app.route("/learn", methods=["GET"])
+def learn_route():
+    """Return learned publisher performance by query cluster (k-anonymity applied)."""
+    cluster = request.args.get("cluster")
+    min_sample = request.args.get("min_sample_size", type=int) or 5
+    payload = get_metrics_store().get_global_publisher_performance(
+        query_cluster=cluster or None,
+        min_sample_size=min_sample,
+    )
+    payload["event_count"] = get_metrics_store().event_count()
+    return jsonify(payload)
+
+
 if __name__ == "__main__":
-    app.run(debug=True)
+    import argparse
+    p = argparse.ArgumentParser()
+    p.add_argument("--port", type=int, default=5001, help="Port (default 5001; macOS often uses 5000 for AirPlay)")
+    p.add_argument("--host", default="127.0.0.1", help="Bind host")
+    args = p.parse_args()
+    print(f" * Open in browser: http://{args.host}:{args.port}/")
+    app.run(debug=True, host=args.host, port=args.port)
