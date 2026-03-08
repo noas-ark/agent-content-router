@@ -472,7 +472,7 @@ def score_source(sigs, src, learned_boost=None):
 def compute_bid_ceiling(sigs: dict) -> float:
     """
     Per-query value ceiling (max bid) based on scoring signals.
-    Higher stakes/credibility/freshness → higher ceiling (SourceRoute DSP logic).
+    Higher stakes/credibility/freshness → higher ceiling (bootk.ai DSP logic).
     """
     cred = sigs.get("credibility") or {}
     fresh = sigs.get("freshness") or {}
