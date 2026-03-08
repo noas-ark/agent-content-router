@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Content Purchase Optimizer · Signal Lab</title>
+<title>SourceRoute · Signal Lab</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='4' fill='%2339d353'/><text x='16' y='22' font-size='18' text-anchor='middle' fill='%23000' font-weight='bold' font-family='system-ui,sans-serif'>⬡</text></svg>" type="image/svg+xml">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -33,6 +34,8 @@
   .pulse-dot{width:5px;height:5px;border-radius:50%;background:var(--accent);animation:pulse 2s infinite}
   .topbar a.admin-link{font-size:10px;color:var(--text-muted);text-decoration:none;letter-spacing:.06em;padding:4px 8px;border-radius:4px;transition:color .15s,background .15s}
   .topbar a.admin-link:hover{color:var(--text-dim);background:var(--surface2)}
+  .topbar a.api-ref-pill{text-decoration:none;transition:opacity .15s,transform .15s}
+  .topbar a.api-ref-pill:hover{opacity:.9;transform:scale(1.02)}
   .query-breakdown{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:12px 14px;margin-bottom:16px}
   .query-breakdown .qb-title{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-muted);margin-bottom:10px;display:flex;align-items:center;gap:6px}
   .query-breakdown .qb-title span:last-child{font-size:8px;font-weight:normal;color:var(--text-muted);opacity:.9}
@@ -45,10 +48,13 @@
   .query-breakdown .qb-chip.trending{color:var(--yellow);border-color:rgba(210,153,34,.3);background:rgba(210,153,34,.08)}
   .query-breakdown .qb-intent-list{color:var(--text-dim);font-size:10px;line-height:1.5}
 
-  /* LAYOUT */
-  .main{flex:1;display:grid;grid-template-columns:280px 1fr 320px;overflow:hidden}
-  .panel{border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
-  .panel:last-child{border-right:none}
+  /* LAYOUT — resizable columns via CSS vars */
+  .main{flex:1;display:flex;overflow:hidden;position:relative}
+  .panel{flex:0 0 auto;width:var(--col-width, 280px);min-width:160px;max-width:600px;display:flex;flex-direction:column;overflow:hidden;border-right:1px solid var(--border)}
+  .panel.panel-mid{flex:1 1 0;min-width:200px;width:auto}
+  .panel.panel-right{flex:1 1 0;min-width:200px;max-width:none;border-right:none}
+  .resize-handle{width:6px;flex-shrink:0;cursor:col-resize;background:transparent;transition:background .15s}
+  .resize-handle:hover,.resize-handle.dragging{background:var(--accent-dim)}
   .ph{height:34px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 14px;gap:7px;font-size:10px;color:var(--text-dim);letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
   .ph-dot{width:6px;height:6px;border-radius:50%;background:var(--text-muted)}
   .ph-dot.on{background:var(--accent);box-shadow:0 0 5px var(--accent)}
@@ -59,7 +65,7 @@
   /* INPUTS */
   .lbl{font-size:9px;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px;margin-top:13px}
   .lbl:first-child{margin-top:0}
-  textarea{width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:5px;color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:1.6;padding:10px;resize:none;outline:none;transition:border-color .15s;min-height:72px}
+  textarea{width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:5px;color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:12px;line-height:1.65;padding:14px;resize:vertical;outline:none;transition:border-color .15s;min-height:160px}
   textarea:focus{border-color:var(--accent)}
   textarea::placeholder{color:var(--text-muted)}
   .run-btn{width:100%;margin-top:13px;padding:10px;background:var(--accent);color:#000;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;letter-spacing:.08em;border:none;border-radius:5px;cursor:pointer;transition:all .15s;text-transform:uppercase}
@@ -69,6 +75,12 @@
   .sc-chip{padding:7px 9px;background:var(--surface2);border:1px solid var(--border2);border-radius:4px;font-size:10px;color:var(--text-dim);cursor:pointer;transition:all .15s;line-height:1.4;margin-bottom:5px}
   .sc-chip:hover{border-color:var(--accent);color:var(--text);background:var(--accent-dim)}
   .sc-tag{font-size:8px;color:var(--text-muted);letter-spacing:.08em;text-transform:uppercase;margin-bottom:2px}
+  .toggle-btn{display:flex;align-items:center;gap:6px;width:100%;padding:6px 0;font-size:9px;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase;background:none;border:none;cursor:pointer;font-family:'IBM Plex Mono',monospace;transition:color .15s}
+  .toggle-btn:hover{color:var(--text-dim)}
+  .toggle-btn .caret{font-size:8px;transition:transform .2s ease}
+  .toggle-btn .caret{display:inline-block}
+  .toggle-btn:not(.open) .caret{transform:rotate(-90deg)}
+  .toggle-btn.open .caret{transform:rotate(0deg)}
 
   /* SIGNAL ROWS */
   .dim-section{margin-bottom:20px}
@@ -207,6 +219,21 @@
   .src-card:nth-child(7){transition-delay:.27s} .src-card:nth-child(8){transition-delay:.31s}
   .src-card:nth-child(9){transition-delay:.35s} .src-card:nth-child(10){transition-delay:.39s}
   .pi:nth-child(1){transition-delay:.35s} .pi:nth-child(2){transition-delay:.5s} .pi:nth-child(3){transition-delay:.65s}
+
+  /* BIDDING TAB */
+  .right-tabs{display:flex;gap:0;margin-bottom:12px;border-bottom:1px solid var(--border)}
+  .right-tab{padding:6px 12px;font-size:10px;font-weight:500;color:var(--text-muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:color .15s,border-color .15s}
+  .right-tab:hover{color:var(--text-dim)}
+  .right-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+  .bid-table{width:100%;font-size:10px;border-collapse:collapse}
+  .bid-table th,.bid-table td{padding:6px 8px;text-align:left;border-bottom:1px solid var(--border)}
+  .bid-table th{color:var(--text-muted);font-weight:500;letter-spacing:.05em}
+  .bid-table td:nth-child(2),.bid-table td:nth-child(3){font-variant-numeric:tabular-nums}
+  .bid-table .dec-buy{color:var(--green);font-weight:600}
+  .bid-table .dec-pass{color:var(--text-muted)}
+  .bid-clickable{cursor:pointer;text-decoration:underline;text-decoration-style:dotted}
+  .bid-clickable:hover{color:var(--accent)}
+  .bid-ceil{font-size:9px;color:var(--text-muted);margin-bottom:8px}
 </style>
 </head>
 <body>
@@ -215,12 +242,13 @@
 <div class="tooltip" id="tooltip"></div>
 
 <div class="topbar">
-  <div class="logo"><div class="logo-icon">⬡</div>Content Purchase Optimizer</div>
+  <div class="logo"><div class="logo-icon">⬡</div>SourceRoute</div>
   <div class="sep"></div>
   <span style="font-size:10px;color:var(--text-dim);letter-spacing:.06em">Signal Lab</span>
   <span class="badge">v0.3</span>
   <div class="ml-auto" style="display:flex;align-items:center;gap:14px">
     <a href="/admin" class="admin-link">Admin</a>
+    <a href="/api-reference" class="badge api-ref-pill">API Reference</a>
     <div class="sep"></div>
     <div class="tbar-stat">runs <span id="totalRuns">0</span></div>
     <div class="tbar-stat">avg saved <span id="avgSavings">—</span></div>
@@ -229,24 +257,23 @@
   </div>
 </div>
 
-<div class="main">
-
+<div class="main" id="mainLayout">
 <!-- LEFT: INPUT -->
-<div class="panel">
+<div class="panel" id="panelLeft" style="width:300px">
   <div class="ph"><div class="ph-dot on"></div>Query Input</div>
   <div class="pb">
     <div class="lbl">Query</div>
-    <textarea id="qi" rows="4" placeholder="e.g. What exactly did Powell say this morning about rate cuts?"></textarea>
+    <textarea id="qi" rows="8" placeholder="e.g. What exactly did Powell say this morning about rate cuts?"></textarea>
     <button class="run-btn" id="runBtn" onclick="go()">▶ Optimize</button>
     <div class="divider"></div>
-    <div class="lbl">Examples</div>
-    <div id="chips"></div>
+    <button type="button" class="toggle-btn" id="examplesToggle" onclick="toggleExamples()"><span class="caret">▼</span> Examples</button>
+    <div id="chipsWrap" style="display:none"><div id="chips"></div></div>
   </div>
 </div>
-
+<div class="resize-handle" id="resize1" data-left="panelLeft" data-right="panelMid" title="Drag to resize"></div>
 <!-- MIDDLE: SIGNAL EXTRACTION -->
-<div class="panel">
-  <div class="ph"><div class="ph-dot" id="midDot"></div>Signal Extraction · 4-Dimension Framework</div>
+<div class="panel panel-mid" id="panelMid">
+  <div class="ph" id="midPh"></div>
   <div class="pb" id="midP">
     <div class="empty">
       <div class="empty-icon">⬡</div>
@@ -254,10 +281,10 @@
     </div>
   </div>
 </div>
-
+<div class="resize-handle" id="resize2" data-left="panelMid" data-right="panelRight" title="Drag to resize"></div>
 <!-- RIGHT: PURCHASE PLAN -->
-<div class="panel">
-  <div class="ph"><div class="ph-dot" id="rightDot"></div>Purchase Plan · ROI</div>
+<div class="panel panel-right" id="panelRight">
+  <div class="ph"><div class="ph-dot" id="rightDot"></div>Purchase Plan</div>
   <div class="pb" id="rightP">
     <div class="empty">
       <div class="empty-icon">$</div>
@@ -334,6 +361,10 @@ document.addEventListener('mouseover', e => {
   const el = e.target.closest('[data-tipid]');
   if (el) { clearTimeout(tipTimeout); showTip(el); }
   else if (!e.target.closest('#tooltip')) hideTip();
+});
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-tipid].bid-clickable');
+  if (el) { clearTimeout(tipTimeout); showTip(el); }
 });
 document.addEventListener('mouseout', e => {
   if (!e.target.closest('[data-tipid]') && !e.target.closest('#tooltip')) hideTip();
@@ -645,8 +676,11 @@ function fmtBig(n){
   return '$'+Math.round(n);
 }
 
+let lastRightRes = null;
+
 function renderRight(res){
-  const {sigs, selected, smartCost, smartQ, naiveCost, naiveQ, savings, savingsPct, selected_articles, search_configured, search_provider} = res;
+  lastRightRes = res;
+  const {sigs, selected, smartCost, smartQ, naiveCost, naiveQ, savings, savingsPct, selected_articles, search_configured, search_provider, bid_ceiling, allScored} = res;
   const dq = 500000;
   const articles = selected_articles || [];
 
@@ -670,8 +704,40 @@ function renderRight(res){
     ? '<div class="search-unconfigured">Using DuckDuckGo. Set <code>BRAVE_API_KEY</code> or <code>GOOGLE_CSE_API_KEY</code> + <code>GOOGLE_CSE_CX</code> in .env to use another provider.</div>'
     : '';
 
+  const bidRows = (allScored || []).map(s => {
+    const ask = s.price === 0 ? 'FREE' : '$' + s.price.toFixed(2);
+    const bid = s.price === 0 ? '—' : '$' + (s.our_bid != null ? s.our_bid.toFixed(3) : '0');
+    const dec = (s.bid_decision || (s.price === 0 ? 'buy' : (s.our_bid >= s.price ? 'buy' : 'pass')));
+    const d = s.bid_detail || {};
+    let tipHtml = '';
+    if (s.price === 0) {
+      tipHtml = '<b>FREE source</b><br>Always buy — no bid required.';
+    } else {
+      tipHtml = '<b>How this bid was calculated</b><br>' +
+        'Formula: <code>' + escapeHtml(d.formula || 'Ask × (0.72 + 0.28 × utility)') + '</code><br>' +
+        'Your utility: ' + (d.utility_pct != null ? d.utility_pct + '%' : pct(s.utility)) + '<br>' +
+        'Calculation: $' + s.price.toFixed(2) + ' × ' + (0.72 + 0.28 * s.utility).toFixed(2) + ' = $' + (s.our_bid || 0).toFixed(3) + '<br><br>' +
+        '<b>Anonymized other bidders</b><br>' +
+        (d.n_others ? d.n_others + ' other bid(s) on similar inventory.<br>' : '') +
+        (d.median_other != null ? 'Median bid: $' + d.median_other.toFixed(3) + '<br>' : '') +
+        (d.percentile != null ? 'You rank in top ' + (100 - d.percentile) + '% of bidders.' : '');
+    }
+    const tipId = registerTip(tipHtml);
+    const bidCell = s.price === 0
+      ? `<td>—</td>`
+      : `<td class="bid-clickable" data-tipid="${tipId}" title="Click or hover for calculation details">${bid}</td>`;
+    return `<tr><td>${escapeHtml(s.name)}</td><td>${ask}</td>${bidCell}<td class="${dec==='buy'?'dec-buy':'dec-pass'}">${dec}</td></tr>`;
+  }).join('');
+
+  const bidCeil = bid_ceiling != null ? `Value ceiling: $${bid_ceiling.toFixed(3)} (from stakes + credibility + freshness)` : '';
+
   document.getElementById('rightP').innerHTML = `
   <div class="fade-in">
+    <div class="right-tabs">
+      <div class="right-tab active" data-tab="plan" onclick="switchRightTab('plan')">Plan</div>
+      <div class="right-tab" data-tab="bidding" onclick="switchRightTab('bidding')">Bidding</div>
+    </div>
+    <div id="rightPlanContent" class="right-tab-content">
     <div style="font-size:9px;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px">Cost Comparison</div>
     <div class="metric-pair">
       <div class="mc"><div class="mc-lbl">Naive (top-3 authority)</div>
@@ -692,9 +758,11 @@ function renderRight(res){
     <div style="font-size:9px;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase;margin:12px 0 8px">Purchase Plan</div>
     <div id="piList">${items||'<div style="font-size:10px;color:var(--text-muted);padding:6px 0">No paid sources needed — free sources sufficient</div>'}</div>
 
+    <!-- COMMENTED OUT: Articles to scrape section
     <div style="font-size:9px;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase;margin:12px 0 8px">Articles to scrape${search_provider ? ' <span style="font-weight:normal;color:var(--text-dim)">(via ' + search_provider + ')</span>' : ''}</div>
     <div id="articleList">${articlesHtml}</div>
     ${searchNote}
+    -->
 
     <div style="font-size:9px;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase;margin:12px 0 8px">Signal-Derived Thresholds</div>
     <div style="background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:4px 10px">
@@ -702,13 +770,15 @@ function renderRight(res){
       <div class="roi-row"><span class="rl">Max source age</span><span class="rv">${sigs.maxFreshnessHours>=9999?'unlimited':sigs.maxFreshnessHours+'h'} <span style="color:var(--text-muted);font-size:9px">(from freshness)</span></span></div>
       <div class="roi-row"><span class="rl">Min sources</span><span class="rv">${sigs.minSources} <span style="color:var(--text-muted);font-size:9px">(from corroboration)</span></span></div>
     </div>
-
-    <div style="font-size:9px;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase;margin:12px 0 8px">ROI at Scale</div>
-    <div class="roi-card">
-      <div class="roi-hdr">at 500K queries / day</div>
-      <div class="roi-row"><span class="rl">Daily savings</span><span class="rv">${fmtBig(savings*dq)}</span></div>
-      <div class="roi-row"><span class="rl">Monthly savings</span><span class="rv">${fmtBig(savings*dq*30)}</span></div>
-      <div class="roi-row"><span class="rl">Annual savings</span><span class="rv hi">${fmtBig(savings*dq*365)}</span></div>
+    </div>
+    <div id="rightBidContent" class="right-tab-content" style="display:none">
+      <div class="bid-ceil">${bidCeil}</div>
+      <div style="font-size:9px;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px">Bids by Source (DSP logic)</div>
+      <table class="bid-table">
+        <thead><tr><th>Source</th><th>Ask</th><th>Our bid</th><th>Decision</th></tr></thead>
+        <tbody>${bidRows}</tbody>
+      </table>
+      <div style="font-size:9px;color:var(--text-muted);margin-top:12px;line-height:1.5">Our bid = ask × (0.72 + 0.28 × utility). Buy if bid ≥ ask, else pass. Click or hover any bid for calculation details.</div>
     </div>
   </div>`;
 
@@ -738,6 +808,16 @@ function showOptimizeLoading(){
     </div>`;
 }
 
+function switchRightTab(tab){
+  document.querySelectorAll('.right-tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===tab));
+  const planEl = document.getElementById('rightPlanContent');
+  const bidEl = document.getElementById('rightBidContent');
+  if(planEl && bidEl){
+    planEl.style.display = tab==='plan' ? 'block' : 'none';
+    bidEl.style.display = tab==='bidding' ? 'block' : 'none';
+  }
+}
+
 async function go(){
   const q = document.getElementById('qi').value.trim();
   if(!q){ document.getElementById('qi').focus(); return; }
@@ -745,7 +825,7 @@ async function go(){
   btn.textContent = '⟳ Analyzing…';
   btn.classList.add('loading');
   btn.disabled = true;
-  document.getElementById('midDot').classList.add('on');
+  const midDot = document.getElementById('midDot'); if(midDot) midDot.classList.add('on');
   document.getElementById('rightDot').classList.add('on');
   showOptimizeLoading();
   const startedAt = Date.now();
@@ -773,7 +853,48 @@ async function go(){
   }
 }
 
+function initResize(){
+  document.querySelectorAll('.resize-handle').forEach(h=>{
+    h.addEventListener('mousedown', function(e){
+      e.preventDefault();
+      const leftId = this.dataset.left, rightId = this.dataset.right;
+      const left = document.getElementById(leftId), right = document.getElementById(rightId);
+      if(!left || !right) return;
+      this.classList.add('dragging');
+      let startX = e.clientX, startW1 = left.offsetWidth, startW2 = right.offsetWidth;
+      function move(e2){
+        const dx = e2.clientX - startX;
+        const w1 = Math.max(160, Math.min(600, startW1 + dx));
+        left.style.width = w1 + 'px';
+        if(right.classList.contains('panel-right')) return;
+        const w2 = Math.max(180, Math.min(600, startW2 - dx));
+        right.style.width = w2 + 'px';
+      }
+      function stop(){
+        document.removeEventListener('mousemove', move);
+        document.removeEventListener('mouseup', stop);
+        document.querySelector('.resize-handle.dragging')?.classList.remove('dragging');
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      }
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+      document.addEventListener('mousemove', move);
+      document.addEventListener('mouseup', stop);
+    });
+  });
+}
+
+function toggleExamples(){
+  const wrap = document.getElementById('chipsWrap');
+  const btn = document.getElementById('examplesToggle');
+  const show = wrap.style.display !== 'block';
+  wrap.style.display = show ? 'block' : 'none';
+  btn.classList.toggle('open', show);
+}
+
 function init(){
+  initResize();
   const chips = document.getElementById('chips');
   SCENARIOS.forEach(s=>{
     const d = document.createElement('div');

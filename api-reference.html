@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>API Reference · SourceRoute</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='4' fill='%2339d353'/><text x='16' y='22' font-size='18' text-anchor='middle' fill='%23000' font-weight='bold' font-family='system-ui,sans-serif'>⬡</text></svg>" type="image/svg+xml">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#080c10; --surface:#0d1117; --surface2:#161b22; --surface3:#1c2333;
+    --border:#21262d; --border2:#30363d;
+    --text:#e6edf3; --text-dim:#8b949e; --text-muted:#484f58;
+    --green:#3fb950; --red:#f85149; --yellow:#d29922; --blue:#388bfd; --purple:#bc8cff;
+    --accent:#39d353; --accent-dim:rgba(57,211,83,.08);
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'IBM Plex Mono',monospace;background:var(--bg);color:var(--text);min-height:100vh;font-size:12px}
+  .topbar{height:44px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 20px;gap:14px}
+  .logo{display:flex;align-items:center;gap:9px;font-size:13px;font-weight:600}
+  .logo-icon{width:20px;height:20px;background:var(--accent);border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:10px;color:#000;font-weight:700}
+  .sep{width:1px;height:18px;background:var(--border2)}
+  .topbar a{color:var(--text-dim);text-decoration:none;font-size:10px;letter-spacing:.06em;padding:4px 10px;border-radius:4px;transition:color .15s,background .15s}
+  .topbar a:hover{color:var(--text);background:var(--surface2)}
+  .topbar .badge{font-size:10px;padding:2px 7px;background:rgba(57,211,83,.1);color:var(--accent);border-radius:20px;border:1px solid rgba(57,211,83,.2);margin-left:auto}
+  .container{max-width:800px;margin:0 auto;padding:32px 24px}
+  .h1{font-size:18px;font-weight:600;margin-bottom:8px}
+  .sub{font-size:11px;color:var(--text-muted);margin-bottom:28px}
+  .endpoint{margin-bottom:36px;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface)}
+  .endpoint-hdr{display:flex;align-items:center;gap:10px;padding:14px 18px;background:var(--surface2);border-bottom:1px solid var(--border)}
+  .meth{font-size:10px;font-weight:600;padding:3px 8px;border-radius:3px;letter-spacing:.08em}
+  .meth.post{background:rgba(63,185,80,.15);color:var(--green)}
+  .meth.get{background:rgba(56,139,253,.15);color:var(--blue)}
+  .path{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:500;color:var(--text)}
+  .endpoint-desc{font-size:11px;color:var(--text-dim);padding:14px 18px;border-bottom:1px solid var(--border);line-height:1.6}
+  .params{padding:14px 18px}
+  .param-row{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+  .param-row:last-child{margin-bottom:0}
+  .param-lbl{font-size:10px;color:var(--text-muted);min-width:140px;flex-shrink:0}
+  .param-inp{flex:1;background:var(--surface2);border:1px solid var(--border2);border-radius:4px;padding:8px 10px;color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:11px;outline:none}
+  .param-inp:focus{border-color:var(--accent)}
+  select.param-inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%238b949e' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10l-5 5z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:28px;cursor:pointer}
+  .param-inp::placeholder{color:var(--text-muted)}
+  textarea.param-inp{min-height:80px;resize:vertical}
+  .try-row{display:flex;align-items:center;gap:12px;padding:12px 18px;background:var(--surface2);border-top:1px solid var(--border)}
+  .try-btn{padding:8px 16px;background:var(--accent);color:#000;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;letter-spacing:.06em;border:none;border-radius:5px;cursor:pointer;transition:background .15s}
+  .try-btn:hover{background:#58e86a}
+  .try-btn.loading{background:var(--surface3);color:var(--text-muted);cursor:wait}
+  .resp-wrap{margin-top:0;border-top:1px solid var(--border)}
+  .resp-hdr{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);padding:8px 18px;background:var(--surface2)}
+  .resp-body{padding:14px 18px;font-size:11px;font-family:'IBM Plex Mono',monospace;white-space:pre-wrap;word-break:break-word;max-height:320px;overflow-y:auto;line-height:1.6}
+  .resp-body.ok{color:var(--green)}
+  .resp-body.err{color:var(--red)}
+  .resp-body.pending{color:var(--text-muted)}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="logo"><div class="logo-icon">⬡</div>SourceRoute</div>
+  <div class="sep"></div>
+  <a href="/">← Back</a>
+  <a href="/admin">Admin</a>
+  <span class="badge">API Reference</span>
+</div>
+<div class="container">
+  <div class="h1">API Reference</div>
+  <div class="sub">Content routing, purchase plan optimization, and bidding. Use the fields below to try each endpoint.</div>
+
+  <!-- POST /optimize -->
+  <div class="endpoint" id="ep-optimize">
+    <div class="endpoint-hdr">
+      <span class="meth post">POST</span>
+      <span class="path">/optimize</span>
+    </div>
+    <div class="endpoint-desc">Optimize content purchase plan for a query. Returns signals, selected sources, bidding data (bid_ceiling, our_bid per source), and articles to scrape.</div>
+    <div class="params">
+      <div class="param-row">
+        <span class="param-lbl">query <i style="color:var(--red)">*</i></span>
+        <textarea class="param-inp" id="opt-query" placeholder="e.g. What did Powell say about rate cuts?">What exactly did Powell say this morning about rate cuts?</textarea>
+      </div>
+      <div class="param-row">
+        <span class="param-lbl">customer_id</span>
+        <input type="text" class="param-inp" id="opt-customer" placeholder="default" value="default">
+      </div>
+    </div>
+    <div class="try-row">
+      <button class="try-btn" onclick="tryOptimize()">Try it</button>
+    </div>
+    <div class="resp-wrap">
+      <div class="resp-hdr">Response</div>
+      <div class="resp-body pending" id="opt-resp">Run the request to see the response.</div>
+    </div>
+  </div>
+
+  <!-- POST /feedback -->
+  <div class="endpoint" id="ep-feedback">
+    <div class="endpoint-hdr">
+      <span class="meth post">POST</span>
+      <span class="path">/feedback</span>
+    </div>
+    <div class="endpoint-desc">Submit outcome feedback for a prior optimization (from event_id in /optimize). Used for learning publisher performance.</div>
+    <div class="params">
+      <div class="param-row">
+        <span class="param-lbl">event_id <i style="color:var(--red)">*</i></span>
+        <input type="text" class="param-inp" id="fb-event" placeholder="event_id from /optimize response">
+      </div>
+      <div class="param-row">
+        <span class="param-lbl">sources_cited (JSON array)</span>
+        <input type="text" class="param-inp" id="fb-cited" placeholder='["Bloomberg","Reuters"]' value='["Bloomberg","Reuters"]'>
+      </div>
+      <div class="param-row">
+        <span class="param-lbl">answer_quality (0–1)</span>
+        <input type="text" class="param-inp" id="fb-quality" placeholder="0.85">
+      </div>
+      <div class="param-row">
+        <span class="param-lbl">user_rating (1–5)</span>
+        <input type="text" class="param-inp" id="fb-rating" placeholder="4">
+      </div>
+      <div class="param-row">
+        <span class="param-lbl">correction_made</span>
+        <input type="text" class="param-inp" id="fb-correction" placeholder="false" value="false">
+      </div>
+    </div>
+    <div class="try-row">
+      <button class="try-btn" onclick="tryFeedback()">Try it</button>
+    </div>
+    <div class="resp-wrap">
+      <div class="resp-hdr">Response</div>
+      <div class="resp-body pending" id="fb-resp">Run the request to see the response.</div>
+    </div>
+  </div>
+
+  <!-- GET /learn -->
+  <div class="endpoint" id="ep-learn">
+    <div class="endpoint-hdr">
+      <span class="meth get">GET</span>
+      <span class="path">/learn</span>
+    </div>
+    <div class="endpoint-desc">Return learned publisher performance by query cluster (k-anonymity applied). Used to refine routing over time.</div>
+    <div class="params">
+      <div class="param-row">
+        <span class="param-lbl">cluster (query param)</span>
+        <select class="param-inp" id="learn-cluster">
+          <option value="">— none —</option>
+          <option value="financial_analysis">financial_analysis</option>
+          <option value="breaking_news">breaking_news</option>
+          <option value="tech_product">tech_product</option>
+          <option value="explainer">explainer</option>
+          <option value="policy">policy</option>
+          <option value="medical_clinical">medical_clinical</option>
+          <option value="financial_analysis_earnings">financial_analysis_earnings</option>
+          <option value="financial_analysis_geopolitics">financial_analysis_geopolitics</option>
+          <option value="breaking_news_multi_perspective">breaking_news_multi_perspective</option>
+          <option value="policy_compliance">policy_compliance</option>
+        </select>
+      </div>
+      <div class="param-row">
+        <span class="param-lbl">min_sample_size (query param)</span>
+        <input type="text" class="param-inp" id="learn-min" placeholder="5" value="5">
+      </div>
+    </div>
+    <div class="try-row">
+      <button class="try-btn" onclick="tryLearn()">Try it</button>
+    </div>
+    <div class="resp-wrap">
+      <div class="resp-hdr">Response</div>
+      <div class="resp-body pending" id="learn-resp">Run the request to see the response.</div>
+    </div>
+  </div>
+</div>
+<script>
+  const base = window.location.origin;
+
+  async function tryOptimize(){
+    const btn = document.querySelector('#ep-optimize .try-btn');
+    const resp = document.getElementById('opt-resp');
+    const query = document.getElementById('opt-query').value.trim();
+    if(!query){ resp.textContent = 'query is required'; resp.className = 'resp-body err'; return; }
+    btn.classList.add('loading');
+    btn.disabled = true;
+    resp.textContent = 'Loading…';
+    resp.className = 'resp-body pending';
+    try {
+      const r = await fetch(base + '/optimize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: query,
+          customer_id: document.getElementById('opt-customer').value.trim() || 'default'
+        })
+      });
+      const data = await r.json().catch(()=>({}));
+      resp.textContent = JSON.stringify(data, null, 2);
+      resp.className = 'resp-body ' + (r.ok ? 'ok' : 'err');
+    } catch(e) {
+      resp.textContent = 'Error: ' + e.message;
+      resp.className = 'resp-body err';
+    }
+    btn.classList.remove('loading');
+    btn.disabled = false;
+  }
+
+  async function tryFeedback(){
+    const btn = document.querySelector('#ep-feedback .try-btn');
+    const resp = document.getElementById('fb-resp');
+    const eventId = document.getElementById('fb-event').value.trim();
+    if(!eventId){ resp.textContent = 'event_id is required'; resp.className = 'resp-body err'; return; }
+    let cited = document.getElementById('fb-cited').value.trim();
+    try { cited = cited ? JSON.parse(cited) : []; } catch(e){ cited = []; }
+    const quality = document.getElementById('fb-quality').value.trim();
+    const rating = document.getElementById('fb-rating').value.trim();
+    const correction = document.getElementById('fb-correction').value.trim().toLowerCase() === 'true';
+    btn.classList.add('loading');
+    btn.disabled = true;
+    resp.textContent = 'Loading…';
+    resp.className = 'resp-body pending';
+    try {
+      const body = { event_id: eventId, sources_cited: cited, correction_made: correction };
+      if(quality) body.answer_quality = parseFloat(quality);
+      if(rating) body.user_rating = parseInt(rating, 10);
+      const r = await fetch(base + '/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const data = await r.json().catch(()=>({}));
+      resp.textContent = JSON.stringify(data, null, 2);
+      resp.className = 'resp-body ' + (r.ok ? 'ok' : 'err');
+    } catch(e) {
+      resp.textContent = 'Error: ' + e.message;
+      resp.className = 'resp-body err';
+    }
+    btn.classList.remove('loading');
+    btn.disabled = false;
+  }
+
+  async function tryLearn(){
+    const btn = document.querySelector('#ep-learn .try-btn');
+    const resp = document.getElementById('learn-resp');
+    const cluster = document.getElementById('learn-cluster').value;
+    const min = document.getElementById('learn-min').value.trim() || '5';
+    const params = new URLSearchParams();
+    if(cluster) params.set('cluster', cluster);
+    params.set('min_sample_size', min);
+    btn.classList.add('loading');
+    btn.disabled = true;
+    resp.textContent = 'Loading…';
+    resp.className = 'resp-body pending';
+    try {
+      const r = await fetch(base + '/learn?' + params.toString());
+      const data = await r.json().catch(()=>({}));
+      resp.textContent = JSON.stringify(data, null, 2);
+      resp.className = 'resp-body ' + (r.ok ? 'ok' : 'err');
+    } catch(e) {
+      resp.textContent = 'Error: ' + e.message;
+      resp.className = 'resp-body err';
+    }
+    btn.classList.remove('loading');
+    btn.disabled = false;
+  }
+</script>
+</body>
+</html>

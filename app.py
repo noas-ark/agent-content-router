@@ -1,4 +1,5 @@
 import math
+import random
 import re
 import uuid
 from urllib.parse import urlparse
@@ -468,15 +469,58 @@ def score_source(sigs, src, learned_boost=None):
     }
 
 
+def compute_bid_ceiling(sigs: dict) -> float:
+    """
+    Per-query value ceiling (max bid) based on scoring signals.
+    Higher stakes/credibility/freshness → higher ceiling (SourceRoute DSP logic).
+    """
+    cred = sigs.get("credibility") or {}
+    fresh = sigs.get("freshness") or {}
+    stakes = cred.get("stakes", 0.4) if isinstance(cred, dict) else 0.4
+    cred_v = cred.get("composed", 0.5) if isinstance(cred, dict) else 0.5
+    fresh_v = fresh.get("composed", 0.5) if isinstance(fresh, dict) else 0.5
+    base = 0.002  # $0.002 minimum
+    cap = 0.008   # $0.008 max for high-stakes
+    factor = 0.4 * stakes + 0.3 * cred_v + 0.3 * fresh_v
+    return round(base + (cap - base) * factor, 4)
+
+
 def optimize(query, customer_id="default"):
     sigs   = extract_signals(query)
     budget = 12.0
+    bid_ceiling = compute_bid_ceiling(sigs)
 
     # Learned publisher performance for this intent (citation rate / value per dollar)
     store = get_metrics_store()
     learned_boost = store.get_learned_domain_boost(sigs["intent"])
 
     scored = [{**s, **score_source(sigs, s, learned_boost)} for s in SOURCES]
+
+    # Add bidding fields: bid closer to ask (realistic); our_bid = ask × (0.72 + 0.28 × utility)
+    for s in scored:
+        if s["price"] == 0:
+            s["our_bid"] = 0
+            s["bid_decision"] = "buy"
+            s["bid_detail"] = {"formula": "FREE", "utility": s["utility"], "others": [], "percentile": None}
+        else:
+            coef = 0.72 + 0.28 * s["utility"]
+            s["our_bid"] = round(s["price"] * coef, 3)
+            s["bid_decision"] = "buy" if s["our_bid"] >= s["price"] else "pass"
+            # Simulate anonymized other bidders (3–6 bids around our_bid)
+            n_others = random.randint(3, 6)
+            others = [round(s["our_bid"] * (0.75 + 0.5 * random.random()), 3) for _ in range(n_others)]
+            others.sort()
+            median_other = others[len(others) // 2] if others else s["our_bid"]
+            rank = sum(1 for o in others if o < s["our_bid"])
+            pct = round(100 * rank / max(len(others), 1))
+            s["bid_detail"] = {
+                "formula": f"Ask × (0.72 + 0.28 × utility)",
+                "utility": round(s["utility"], 3),
+                "utility_pct": round(100 * s["utility"]),
+                "n_others": n_others,
+                "median_other": median_other,
+                "percentile": pct,
+            }
 
     # GATE 1: Eligibility (hard filters)
     eligible, ineligible = [], []
@@ -537,6 +581,7 @@ def optimize(query, customer_id="default"):
         "ineligible": ineligible[:6],
         "rejected":   rejected[:4],
         "allScored":  scored,
+        "bid_ceiling": bid_ceiling,
         "smartCost":  spent,
         "smartQ":     smart_q,
         "naiveCost":  naive_cost,
@@ -562,6 +607,12 @@ def admin():
     return send_from_directory(".", "admin.html")
 
 
+@app.route("/api-reference")
+def api_reference():
+    """Interactive API documentation for content routing, purchase plan, and bidding."""
+    return send_from_directory(".", "api-reference.html")
+
+
 @app.route("/optimize", methods=["POST"])
 def optimize_route():
     data = request.get_json() or {}
@@ -571,26 +622,30 @@ def optimize_route():
 
     # Articles to scrape: show every search result (no filter by purchase plan).
     # Each result is turned into an article; catalog domains get name+price, others get domain label + "—".
-    result["search_configured"] = is_search_configured()
-    result["search_provider"] = get_search_provider_name()
+    # COMMENTED OUT: search integration
+    # result["search_configured"] = is_search_configured()
+    # result["search_provider"] = get_search_provider_name()
+    # result["selected_articles"] = []
+    # if is_search_configured():
+    #     try:
+    #         search_results, provider_used = fetch_search_results(query, num=15)
+    #         result["selected_articles"] = _search_results_to_articles(search_results)
+    #         result["search_provider"] = provider_used
+    #         if not result["selected_articles"] and search_results:
+    #             app.logger.warning(
+    #                 "Search returned %s results but 0 articles (query %r). First result keys: %s",
+    #                 len(search_results), query[:40], list(search_results[0].keys()) if search_results else None,
+    #             )
+    #         elif not result["selected_articles"]:
+    #             app.logger.info(
+    #                 "Search returned 0 results for %r (provider %s). Tip: set BRAVE_API_KEY in .env for reliable search.",
+    #                 query[:40], provider_used,
+    #             )
+    #     except Exception as e:
+    #         app.logger.warning("Search failed for %r: %s", query[:50], e)
+    result["search_configured"] = False
+    result["search_provider"] = None
     result["selected_articles"] = []
-    if is_search_configured():
-        try:
-            search_results, provider_used = fetch_search_results(query, num=15)
-            result["selected_articles"] = _search_results_to_articles(search_results)
-            result["search_provider"] = provider_used
-            if not result["selected_articles"] and search_results:
-                app.logger.warning(
-                    "Search returned %s results but 0 articles (query %r). First result keys: %s",
-                    len(search_results), query[:40], list(search_results[0].keys()) if search_results else None,
-                )
-            elif not result["selected_articles"]:
-                app.logger.info(
-                    "Search returned 0 results for %r (provider %s). Tip: set BRAVE_API_KEY in .env for reliable search.",
-                    query[:40], provider_used,
-                )
-        except Exception as e:
-            app.logger.warning("Search failed for %r: %s", query[:50], e)
 
     # Persist conversion event for learning (purchase decision; outcomes via /feedback)
     event_id = str(uuid.uuid4())
