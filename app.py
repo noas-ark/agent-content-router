@@ -1,7 +1,15 @@
+import logging
 import math
+import os
 import random
+import threading
 import re
+import time
 import uuid
+from datetime import datetime, timedelta, timezone
+import urllib.request
+import urllib.parse
+import json as _json
 from urllib.parse import urlparse
 
 from dotenv import load_dotenv
@@ -11,8 +19,44 @@ from flask import Flask, request, jsonify, send_from_directory
 
 from learning import ConversionEvent, get_metrics_store
 from search_provider import fetch_search_results, is_search_configured, get_search_provider_name
+from rag_coverage import enrich_free_results_with_rag, warm_embedding_model
+
+from deep_research_tasks import (
+    FRAMEWORK_URL as DEEP_RESEARCH_FRAMEWORK_URL,
+    evaluate_research_completeness,
+    plan_search_tasks,
+)
+
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
+MAX_OPTIMIZE_SECONDS = float(os.environ.get("MAX_OPTIMIZE_SECONDS", "30"))
+# One Valyu tier-diff probe per gap by default (up to this many per /optimize).
+MAX_VALYU_PROBES_PER_REQUEST = max(1, int(os.environ.get("MAX_VALYU_PROBES_PER_REQUEST", "5")))
+# Brave Web Search API allows up to 20 results per request; was previously hard-coded to 5.
+BRAVE_WEB_RESULT_COUNT = max(1, min(20, int(os.environ.get("BRAVE_WEB_RESULT_COUNT", "20"))))
+COVERAGE_GAP_POLICY = (
+    "A sub-query is in 'gap' when the highest free-hit relevance score is below that "
+    "sub-query's quality floor (from signals). Relevance = max(RAG max-chunk similarity, "
+    "snippet heuristic). 'ok' means a free hit met the floor; otherwise we may run a paid-tier probe."
+)
+QUERY_FAN_OUT_REF = "https://dejan.ai/blog/query-fan-out-prompt/"
+# Planner pattern only (see deep_reasoning_researcher); decomposition uses this when LLM is available.
+
+
+def _start_rag_model_warm() -> None:
+    """Avoid blocking the first /optimize on Hugging Face download + model load (can take minutes)."""
+
+    def _run() -> None:
+        try:
+            warm_embedding_model()
+        except Exception:
+            pass
+
+    threading.Thread(target=_run, daemon=True, name="bootk-rag-warm").start()
+
+
+_start_rag_model_warm()
 
 # ═══════════════════════════════════════════════════════════════
 # DATA
@@ -125,9 +169,193 @@ def cos_sim(a, b):
     return inter / math.sqrt(len(wa) * len(wb))
 
 
+# Named-entity extraction: spaCy statistical NER (same family of tooling as production routers;
+# see https://spacy.io/models/en#en_core_web_sm). Regex only if spaCy / model unavailable.
+_SPACY_NLP = None  # lazy: loaded Language, False if load failed, None = not attempted
+
+_NER_LABELS = frozenset(
+    {
+        "PERSON",
+        "NORP",
+        "FAC",
+        "ORG",
+        "GPE",
+        "LOC",
+        "PRODUCT",
+        "EVENT",
+        "WORK_OF_ART",
+        "LAW",
+        "LANGUAGE",
+        "DATE",
+    }
+)
+
+
+def _is_vague_temporal_for_linking(text: str) -> bool:
+    """
+    True if the span is a relative / deictic time phrase, not a linkable named entity.
+    spaCy often labels these as DATE; they should not appear under "entity linking".
+    """
+    t = text.strip().casefold()
+    if not t:
+        return True
+    if t in _VAGUE_TIME_EXACT:
+        return True
+    if _VAGUE_TIME_ANYWHERE.search(f" {t} "):
+        return True
+    return False
+
+
+# Whole-string or substring matches for "last year", "past 3 months", etc.
+_VAGUE_TIME_EXACT = frozenset(
+    {
+        "last year",
+        "this year",
+        "next year",
+        "last week",
+        "this week",
+        "next week",
+        "last month",
+        "this month",
+        "next month",
+        "last quarter",
+        "this quarter",
+        "next quarter",
+        "yesterday",
+        "today",
+        "tomorrow",
+        "tonight",
+        "last night",
+        "this morning",
+        "right now",
+        "recently",
+        "lately",
+        "currently",
+    }
+)
+
+_VAGUE_TIME_ANYWHERE = re.compile(
+    r"\b(?:"
+    r"last\s+year|this\s+year|next\s+year|"
+    r"last\s+week|this\s+week|next\s+week|"
+    r"last\s+month|this\s+month|next\s+month|"
+    r"last\s+quarter|this\s+quarter|next\s+quarter|"
+    r"yesterday|today|tomorrow|tonight|recently|lately|currently|"
+    r"last\s+night|this\s+morning|right\s+now|"
+    r"(?:last|this|next|past|coming)\s+(?:year|week|month|quarter|day|night|summer|winter|spring|fall|autumn)\b|"
+    r"(?:last|next|this)\s+\d{1,3}\s+(?:hours?|days?|weeks?|months?|years?)\b|"
+    r"\d+\s+(?:years?|months?|weeks?|days?)\s+ago"
+    r")\b",
+    re.IGNORECASE,
+)
+
+
+def _get_spacy_nlp():
+    """
+    Lazy-load spaCy NER once. Tries `import en_core_web_sm` first (works when the model
+    wheel is installed via pip); then `spacy.load("en_core_web_sm")`.
+
+    If both fail, the usual cause is: `pip install` without the `en_core_web_sm` package
+    (see requirements.txt). Install deps and check logs for the underlying exception.
+    """
+    global _SPACY_NLP
+    if _SPACY_NLP is not None:
+        return None if _SPACY_NLP is False else _SPACY_NLP
+    err_chain = []
+    try:
+        import en_core_web_sm  # type: ignore
+
+        _SPACY_NLP = en_core_web_sm.load()
+        logger.info("spaCy NER: loaded en_core_web_sm")
+        return _SPACY_NLP
+    except Exception as e:
+        err_chain.append(f"en_core_web_sm.load(): {e!r}")
+    try:
+        import spacy  # type: ignore
+
+        _SPACY_NLP = spacy.load("en_core_web_sm")
+        logger.info("spaCy NER: loaded via spacy.load('en_core_web_sm')")
+        return _SPACY_NLP
+    except Exception as e:
+        err_chain.append(f"spacy.load(): {e!r}")
+    _SPACY_NLP = False
+    logger.warning(
+        "spaCy NER unavailable — entity extraction falls back to years only (%s). "
+        "Fix: pip install -r requirements.txt (includes en_core_web_sm wheel).",
+        "; ".join(err_chain),
+    )
+    return None
+
+
+def _extract_entities_fallback_no_ner(text: str) -> list:
+    """
+    When the statistical NER model is missing, we do not fake entities with capital-letter
+    regex (that misses lowercase names and invents false positives). Only calendar years.
+    """
+    out = []
+    for y in re.findall(r"\b(20\d{2}|19\d{2})\b", text):
+        if y not in out:
+            out.append(y)
+    return out
+
+
+def extract_named_entities(text: str) -> list:
+    """
+    Return ordered, de-duplicated entity strings for routing / UI.
+    Prefer spaCy NER spans (ORG, PERSON, GPE, …); add 4-digit years if not already covered.
+    """
+    text = (text or "").strip()
+    if not text:
+        return []
+    nlp = _get_spacy_nlp()
+    if nlp:
+        doc = nlp(text)
+        seen: set = set()
+        out: list = []
+        for ent in doc.ents:
+            if ent.label_ not in _NER_LABELS:
+                continue
+            t = ent.text.strip()
+            if len(t) < 2:
+                continue
+            if ent.label_ == "DATE" and _is_vague_temporal_for_linking(t):
+                continue
+            k = t.casefold()
+            if k in seen:
+                continue
+            seen.add(k)
+            out.append(t)
+        for m in re.finditer(r"\b(20\d{2}|19\d{2})\b", text):
+            y = m.group(1)
+            if y.casefold() not in seen:
+                seen.add(y.casefold())
+                out.append(y)
+        return out
+    return _extract_entities_fallback_no_ner(text)
+
+
 def extract_signals(query):
+    """
+    Semantic-router signal bundle for one query (used by /optimize UI and learning).
+
+    Emits:
+    - queryUnderstanding: purchase_intent (content type, domain, freshness need, quality floor),
+      entity_linking (spaCy NER spans), intent_template, trending_signal, query_cluster,
+      routing_rules_fired, tier_strategy
+    - intent + intentScores (keyword cosine vs fixed intent profile bags)
+    - entities (same strings as entity_linking)
+    - relevance: semantic, entityDensity, specificity, templateBoost, composed
+    - credibility: stakes, sensitivity, corroboration, controversy, composed
+    - freshness: velocity, temporalMarkers, timeMarkers, eventUrgency, decayRate, composed
+    - depth: complexity, depthRequired, questionType (Broder-style), ambiguity, composed
+    - qualityThreshold, minSources, maxFreshnessHours
+
+    vLLM-style “semantic routers” elsewhere often add embedding similarity and LLM-scored
+    intent; this stack is mostly lexical/heuristic + NER by design.
+    """
     q = query.lower()
     words = q.split()
+    entities = extract_named_entities(query)
 
     # ── Intent classification ──────────────────────────────────
     intent_profiles = {
@@ -143,7 +371,7 @@ def extract_signals(query):
     intent = sorted_intents[0][0]
     top_intent_score = sorted_intents[0][1]
     # "What happened in X" / entity-heavy ambiguous -> prefer news/wire
-    has_entity = bool(re.search(r"\b[A-Z][a-z]{2,}\b", query))
+    has_entity = bool(entities) or bool(re.search(r"\b[A-Z][a-z]{2,}\b", query))
     what_happened = bool(re.search(r"\bwhat('s|\s+is|\s+happened|\s+happening)\b", q))
     # Override: (1) "what happened/happening" implies news even with lowercase "iran"; (2) ambiguous + entity
     if what_happened or (top_intent_score < 0.12 and has_entity):
@@ -152,10 +380,6 @@ def extract_signals(query):
     semantic_raw = min(top_intent_score * 3.8 + 0.22, 0.98)
 
     # ── DIMENSION 1: RELEVANCE ────────────────────────────────
-    entity_re = r'\b([A-Z][a-z]{1,}(?:\s[A-Z][a-z]{1,})*|[A-Z]{2,6})\b'
-    raw_entities = re.findall(entity_re, query)
-    skip = {'The', 'A', 'An', 'In', 'On', 'At', 'Is', 'It', 'If', 'Do', 'Be', 'We', 'My'}
-    entities = [e for e in raw_entities if len(e) > 1 and e not in skip]
     entity_density_raw = min(len(entities) / 7, 1.0)
 
     specific_markers = r'\b(q[1-4]|20[2-9]\d|\$[\d]+|percent|%|basis\s*points|ipo|ceo|cfo|merger|acquisition|exactly|specific|detail|result)\b'
@@ -469,126 +693,832 @@ def score_source(sigs, src, learned_boost=None):
     }
 
 
+INTENT_BASE = {
+    "prior_art": 1.00,
+    "regulatory": 0.75,
+    "analysis": 0.50,
+    "breaking_news": 0.35,
+    "historical": 0.00,
+    "factual_lookup": 0.00,
+}
+
+
+def _env_first(*names: str) -> str:
+    for name in names:
+        value = os.environ.get(name, "").strip()
+        if value:
+            return value
+    return ""
+
+
+def _instructor_client():
+    api_key = _env_first("DSAIL_OPENAI_API_KEY", "OPENAI_API_KEY")
+    if not api_key:
+        return None
+    try:
+        import instructor  # type: ignore
+        from openai import OpenAI  # type: ignore
+        return instructor.from_openai(OpenAI(api_key=api_key))
+    except Exception:
+        return None
+
+
+def _extract_entities_local(text: str) -> list:
+    """Same NER path as extract_signals (spaCy + regex fallback)."""
+    return extract_named_entities(text)
+
+
+def _routing_confidence(keyword_hits, domain, intent) -> float:
+    conf = 0.2
+    if keyword_hits:
+        conf += 0.3
+    if domain != "general":
+        conf += 0.25
+    if intent != "factual_lookup":
+        conf += 0.25
+    return min(conf, 1.0)
+
+
 def compute_bid_ceiling(sigs: dict) -> float:
+    base = INTENT_BASE.get(sigs.get("intent"), 0.25)
+    if sigs.get("domain") == "medical" and sigs.get("quality_threshold", 0) >= 0.85:
+        base = max(base, 0.75)
+    if sigs.get("domain") == "legal" and sigs.get("intent") in ("prior_art", "regulatory"):
+        base = max(base, 0.60)
+    multiplier = 0.6 + sigs.get("complexity_score", 0.5) * 0.4
+    if sigs.get("quality_threshold", 0.7) < 0.7:
+        multiplier *= 0.5
+    return round(min(base * multiplier, 2.0), 4)
+
+
+def _infer_signals_local(query: str, goal: str) -> dict:
+    text = f"{query} {goal}".lower()
+    entities = _extract_entities_local(f"{query} {goal}")
+    keyword_groups = {
+        "finance": ["revenue", "earnings", "market", "stock", "tariff", "gdp"],
+        "medical": ["trial", "drug", "clinical", "patient", "fda"],
+        "legal": ["regulation", "law", "compliance", "act", "court"],
+        "news": ["today", "latest", "breaking", "announced", "update"],
+    }
+    keyword_hits = [k for k, terms in keyword_groups.items() if any(t in text for t in terms)]
+    if "news" in keyword_hits:
+        intent = "breaking_news"
+    elif "legal" in keyword_hits:
+        intent = "regulatory"
+    elif "medical" in keyword_hits:
+        intent = "analysis"
+    elif "finance" in keyword_hits:
+        intent = "analysis"
+    elif any(w in text for w in ["history", "background", "overview"]):
+        intent = "historical"
+    else:
+        intent = "factual_lookup"
+
+    if "medical" in keyword_hits:
+        domain = "medical"
+    elif "legal" in keyword_hits:
+        domain = "legal"
+    elif "finance" in keyword_hits:
+        domain = "financial"
+    else:
+        domain = "general"
+    complexity_score = min(1.0, (len(query.split()) + len(goal.split())) / 28)
+    requires_freshness = "news" in keyword_hits
+    quality_threshold = 0.9 if intent in ("prior_art", "regulatory") else (0.82 if intent in ("analysis", "breaking_news") else 0.65)
+    content_type_needed = (
+        "news_article" if intent == "breaking_news"
+        else "regulatory_doc" if intent == "regulatory"
+        else "academic_paper" if domain == "medical"
+        else "market_data" if domain == "financial"
+        else "primary_source"
+    )
+    signals = {
+        "query": query,
+        "goal": goal,
+        "intent": intent,
+        "task_type": "synthesis",
+        "domain": domain,
+        "sub_domain": None,
+        "entities": entities,
+        "intent_template": None,
+        "requires_freshness": requires_freshness,
+        "content_type_needed": content_type_needed,
+        "quality_threshold": round(quality_threshold, 3),
+        "complexity_score": round(complexity_score, 3),
+        "keyword_hits": keyword_hits,
+        "routing_confidence": round(_routing_confidence(keyword_hits, domain, intent), 3),
+        "valyu_sources": [],
+    }
+    signals["max_price_usd"] = compute_bid_ceiling(signals)
+    signals["price_derivation"] = {
+        "intent_base": INTENT_BASE.get(intent, 0.25),
+        "complexity_multiplier": round(0.6 + complexity_score * 0.4, 3),
+        "quality_threshold": signals["quality_threshold"],
+        "max_price_usd": signals["max_price_usd"],
+    }
+    return signals
+
+
+def _current_date_str() -> str:
+    return datetime.now(timezone.utc).strftime("%B %d, %Y")
+
+
+def _decompose_query_local(query: str, n: int = 3) -> dict:
+    """Heuristic fan-out when Instructor/OpenAI is unavailable (DEJAN-style behavior)."""
+    q = query.strip()
+    tokens = [w for w in re.split(r"\s+", q) if w]
+    date_s = _current_date_str()
+    rationale = (
+        f"Local fan-out (no LLM): prefer minimal queries; one aspect per string. "
+        f"Date context: {date_s}. Original topic: {q[:200]}{'…' if len(q) > 200 else ''}"
+    )
+    if len(tokens) <= 10:
+        return {
+            "sub_queries": [{"query": q, "goal": rationale}],
+            "rationale": rationale,
+            "source": "local",
+        }
+    chunks = []
+    step = max(3, len(tokens) // min(n, max(2, len(tokens) // 4)))
+    for i in range(0, len(tokens), step):
+        part = " ".join(tokens[i : i + step]).strip()
+        if part:
+            chunks.append({"query": part, "goal": rationale})
+    sub = chunks[:n] or [{"query": q, "goal": rationale}]
+    return {"sub_queries": sub, "rationale": rationale, "source": "local"}
+
+
+def _decompose_query(query: str, n: int = 3) -> dict:
     """
-    Per-query value ceiling (max bid) based on scoring signals.
-    Higher stakes/credibility/freshness → higher ceiling (bootk.ai DSP logic).
+    Targeted search tasks via the deep_reasoning_researcher *planner* pattern (distinct web
+    queries per facet). Falls back to local heuristics when no LLM.
+    Returns { sub_queries: [{query, goal}], rationale: str, source: str }.
     """
-    cred = sigs.get("credibility") or {}
-    fresh = sigs.get("freshness") or {}
-    stakes = cred.get("stakes", 0.4) if isinstance(cred, dict) else 0.4
-    cred_v = cred.get("composed", 0.5) if isinstance(cred, dict) else 0.5
-    fresh_v = fresh.get("composed", 0.5) if isinstance(fresh, dict) else 0.5
-    base = 0.002  # $0.002 minimum
-    cap = 0.008   # $0.008 max for high-stakes
-    factor = 0.4 * stakes + 0.3 * cred_v + 0.3 * fresh_v
-    return round(base + (cap - base) * factor, 4)
+    client = _instructor_client()
+    if client is not None:
+        dr = plan_search_tasks(query, n, client)
+        if dr:
+            return dr
+    return _decompose_query_local(query, n=n)
+
+
+def _build_research_digest(sub_query_runs: list) -> str:
+    """Titles/snippets only — what the critic judges (no full article body)."""
+    parts: list[str] = []
+    for run in sub_query_runs:
+        if not isinstance(run, dict):
+            continue
+        parts.append(f"=== Sub-query {run.get('index', '?')}: {run.get('query', '')} ===")
+        for r in (run.get("free_results") or [])[:10]:
+            if not isinstance(r, dict):
+                continue
+            title = (r.get("title") or "")[:220]
+            snip = ((r.get("snippet") or "").replace("\n", " "))[:400]
+            parts.append(f"- {title}\n  {snip}")
+    return "\n".join(parts)
+
+
+def _infer_signals(query: str, goal: str) -> dict:
+    client = _instructor_client()
+    local = _infer_signals_local(query, goal)
+    if client is None:
+        return local
+    try:
+        from pydantic import BaseModel
+        from typing import Literal
+
+        class SignalModel(BaseModel):
+            intent: Literal["prior_art", "factual_lookup", "analysis", "breaking_news", "historical", "regulatory"]
+            task_type: Literal["synthesis", "validation", "comparison", "discovery", "factual_lookup"]
+            domain: Literal["scientific", "legal", "financial", "medical", "competitive", "general"]
+            sub_domain: str | None = None
+            intent_template: str | None = None
+            requires_freshness: bool
+            content_type_needed: Literal[
+                "academic_paper",
+                "news_article",
+                "regulatory_doc",
+                "market_data",
+                "primary_source",
+                "case_law",
+            ]
+            quality_threshold: float
+
+        prompt = (
+            "Extract structured routing signals for this research sub-query.\n"
+            f"Query: {query}\n"
+            f"Goal: {goal}\n"
+            "Use the schema fields only. Keep quality_threshold in [0,1]."
+        )
+        model_out = client.chat.completions.create(
+            model="gpt-4o-mini",
+            response_model=SignalModel,
+            messages=[
+                {"role": "system", "content": "You are a query understanding system for content routing."},
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0.0,
+            timeout=8,
+        )
+        signals = {
+            **local,
+            "intent": model_out.intent,
+            "task_type": model_out.task_type,
+            "domain": model_out.domain,
+            "sub_domain": model_out.sub_domain,
+            "intent_template": model_out.intent_template,
+            "requires_freshness": bool(model_out.requires_freshness),
+            "content_type_needed": model_out.content_type_needed,
+            "quality_threshold": max(0.0, min(1.0, float(model_out.quality_threshold))),
+        }
+        signals["max_price_usd"] = compute_bid_ceiling(signals)
+        signals["price_derivation"] = {
+            "intent_base": INTENT_BASE.get(signals["intent"], 0.25),
+            "complexity_multiplier": round(0.6 + signals.get("complexity_score", 0.5) * 0.4, 3),
+            "quality_threshold": signals["quality_threshold"],
+            "max_price_usd": signals["max_price_usd"],
+            "source": "instructor+local-derivation",
+        }
+        return signals
+    except Exception:
+        return local
+
+
+def _brave_search(query: str, count=None):
+    if count is None:
+        count = BRAVE_WEB_RESULT_COUNT
+    key = _env_first("DSAIL_BRAVE_API_KEY", "BRAVE_API_KEY")
+    if not key:
+        return []
+    url = "https://api.search.brave.com/res/v1/web/search?" + urllib.parse.urlencode(
+        {"q": query, "count": count, "search_lang": "en"}
+    )
+    req = urllib.request.Request(
+        url,
+        headers={
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+            "X-Subscription-Token": key,
+            "User-Agent": "bootk-ai-router/4.0",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=12) as resp:
+            payload = _json.loads(resp.read().decode())
+        results = (payload.get("web") or {}).get("results") or []
+        return [{
+            "title": r.get("title", ""),
+            "url": r.get("url", ""),
+            "snippet": r.get("description", ""),
+            "source": ((r.get("profile") or {}).get("name") or _host_from_url(r.get("url", ""))),
+            "date": r.get("page_age"),
+        } for r in results[:count]]
+    except Exception:
+        return []
+
+
+def _snippet_coverage_score(result: dict, signals: dict) -> float:
+    """Heuristic score from title + snippet only (fallback when RAG fetch unavailable)."""
+    text = f"{result.get('title','')} {result.get('snippet','')}".lower()
+    entities = signals.get("entities") or []
+    entity_cov = (sum(1 for e in entities if str(e).lower() in text) / len(entities)) if entities else 0.5
+    keyword_hits = signals.get("keyword_hits") or []
+    keyword_score = (sum(1 for k in keyword_hits if k.lower() in text) / max(len(keyword_hits), 1))
+    temporal = 0.85 if signals.get("requires_freshness") and result.get("date") else 0.7
+    return round(entity_cov * 0.4 + temporal * 0.25 + keyword_score * 0.2 + 0.15, 3)
+
+
+def _to_cpm(per_doc_usd: float) -> int:
+    if per_doc_usd <= 0:
+        return 0
+    if per_doc_usd < 0.01:
+        return 2
+    if per_doc_usd < 0.05:
+        return 10
+    if per_doc_usd < 0.20:
+        return 30
+    return 50
+
+
+def _infer_price_from_source_url(url: str, cpm_ceiling: int) -> float:
+    u = (url or "").lower()
+    tier_map = {
+        "arxiv.org": 0.0005,
+        "pubmed.ncbi.nlm.nih.gov": 0.0005,
+        "clinicaltrials.gov": 0.0005,
+        "sec.gov": 0.0005,
+        "biorxiv.org": 0.0005,
+        "medrxiv.org": 0.0005,
+    }
+    for d, p in tier_map.items():
+        if d in u:
+            return p
+    if any(d in u for d in ["wiley.com", "springer.com", "elsevier.com", "nature.com"]):
+        return min(0.05, cpm_ceiling / 1000.0)
+    return min(0.0015, cpm_ceiling / 1000.0)
+
+
+def _valyu_api_key_present() -> bool:
+    return bool(_env_first("DSAIL_VALYU_API_KEY", "VALYU_API_KEY"))
+
+
+def _empty_probe_record(sub_query: str, *, skipped_reason: str, attempted: bool) -> dict:
+    return {
+        "sub_query": sub_query,
+        "free_count": 0,
+        "paid_count": 0,
+        "new_at_paid": 0,
+        "results": [],
+        "skipped_reason": skipped_reason,
+        "attempted": attempted,
+    }
+
+
+def _probe_valyu(sub_query: str, signals: dict) -> dict:
+    key = _env_first("DSAIL_VALYU_API_KEY", "VALYU_API_KEY")
+    if not key:
+        return {
+            "sub_query": sub_query,
+            "free_count": 0,
+            "paid_count": 0,
+            "new_at_paid": 0,
+            "results": [],
+            "skipped_reason": None,
+            "attempted": True,
+        }
+    try:
+        from valyu import Valyu  # type: ignore
+    except Exception:
+        return {
+            "sub_query": sub_query,
+            "free_count": 0,
+            "paid_count": 0,
+            "new_at_paid": 0,
+            "results": [],
+            "skipped_reason": None,
+            "attempted": True,
+        }
+    valyu = Valyu(api_key=key)
+    raw_ceiling = signals.get("max_price_usd", 0) or 0
+    cpm_ceiling = _to_cpm(raw_ceiling)
+    # Proprietary index with data_max_price=0 often returns nothing; use a small floor so tier-diff runs.
+    cpm_for_proprietary = max(int(cpm_ceiling), 1)
+    err_note: str | None = None
+    try:
+        free_tier = valyu.search(
+            sub_query,
+            search_type="all",
+            data_max_price=0,
+            max_num_results=5,
+            included_sources=signals.get("valyu_sources") or None,
+        )
+        paid_tier = valyu.search(
+            sub_query,
+            search_type="proprietary",
+            data_max_price=cpm_for_proprietary,
+            max_num_results=5,
+            included_sources=signals.get("valyu_sources") or None,
+        )
+        free_results = list(getattr(free_tier, "results", []) or [])
+        paid_results = list(getattr(paid_tier, "results", []) or [])
+    except Exception as ex:
+        err_note = (str(ex) or type(ex).__name__)[:220]
+        return {
+            "sub_query": sub_query,
+            "free_count": 0,
+            "paid_count": 0,
+            "new_at_paid": 0,
+            "results": [],
+            "skipped_reason": None,
+            "attempted": True,
+            "valyu_error": err_note,
+        }
+
+    free_urls = {getattr(r, "url", "") for r in free_results}
+    paid_urls = {getattr(r, "url", "") for r in paid_results}
+    new_at_paid = paid_urls - free_urls
+    out = []
+    for r in paid_results:
+        url = getattr(r, "url", "")
+        out.append({
+            "title": getattr(r, "title", ""),
+            "url": url,
+            "snippet": (getattr(r, "content", "") or "")[:400],
+            "source": _host_from_url(url),
+            "date": getattr(r, "publication_date", None),
+            "inferred_price": _infer_price_from_source_url(url, cpm_ceiling) if url in new_at_paid else 0.0,
+            "unlocked_at": "paid" if url in new_at_paid else "free",
+        })
+    # We only iterated paid_results above; if proprietary returned nothing but the free index had hits,
+    # still surface those so the UI shows Valyu responded (tier-diff just has no paid-only URLs).
+    only_free_fallback = False
+    if not out and free_results:
+        only_free_fallback = True
+        for r in free_results[:5]:
+            url = getattr(r, "url", "")
+            out.append({
+                "title": getattr(r, "title", ""),
+                "url": url,
+                "snippet": (getattr(r, "content", "") or "")[:400],
+                "source": _host_from_url(url),
+                "date": getattr(r, "publication_date", None),
+                "inferred_price": 0.0,
+                "unlocked_at": "free",
+            })
+    return {
+        "sub_query": sub_query,
+        "free_count": len(free_results),
+        "paid_count": len(paid_results),
+        "new_at_paid": len(new_at_paid),
+        "results": out,
+        "skipped_reason": None,
+        "attempted": True,
+        "valyu_only_free_tier": only_free_fallback,
+        "valyu_proprietary_cpm_used": cpm_for_proprietary,
+    }
+
+
+CONTENT_TYPE_MAP = {
+    ("arxiv", "academic_paper"): 1.0,
+    ("pubmed", "academic_paper"): 1.0,
+    ("sec", "market_data"): 1.0,
+    ("sec", "regulatory_doc"): 0.8,
+    ("wiley", "academic_paper"): 1.0,
+}
+
+
+def _relevance_score(result: dict, signals: dict) -> float:
+    text = f"{result.get('title','')} {result.get('snippet','')}".lower()
+    entities = signals.get("entities") or []
+    entity_cov = (sum(1 for e in entities if str(e).lower() in text) / len(entities)) if entities else 0.5
+    src = (result.get("source") or "").lower()
+    content_needed = signals.get("content_type_needed", "primary_source")
+    type_score = 0.5
+    for (k_src, k_type), v in CONTENT_TYPE_MAP.items():
+        if k_src in src and k_type == content_needed:
+            type_score = v
+            break
+    keyword_hits = signals.get("keyword_hits") or []
+    keyword_score = (sum(1 for k in keyword_hits if k.lower() in text) / max(len(keyword_hits), 1))
+    temporal = 0.85 if signals.get("requires_freshness") and result.get("date") else 0.7
+    return round(entity_cov * 0.35 + keyword_score * 0.25 + type_score * 0.25 + temporal * 0.15, 3)
+
+
+def _compute_bid(signals: dict, result: dict) -> dict:
+    rel = _relevance_score(result, signals)
+    bid = round(signals.get("max_price_usd", 0) * rel, 4)
+    inferred = result.get("inferred_price", 0)
+    return {
+        "relevance_score": rel,
+        "bid": bid,
+        "inferred_price": inferred,
+        "decision": "buy" if bid >= inferred else "pass",
+        "reasoning": f"ceiling ${signals.get('max_price_usd', 0)} × rel {rel:.2f} = bid ${bid:.4f}",
+    }
 
 
 def optimize(query, customer_id="default"):
-    sigs   = extract_signals(query)
-    budget = 12.0
-    bid_ceiling = compute_bid_ceiling(sigs)
+    deadline = time.time() + MAX_OPTIMIZE_SECONDS
+    _decomp = _decompose_query(query, n=3)
+    sub_queries = _decomp.get("sub_queries") or []
+    query_fan_out_rationale = (_decomp.get("rationale") or "").strip()
+    sq_with_signals = []
+    free_results = {}
+    probe_results = {}
+    search_providers: dict = {}
+    all_candidates = []
 
-    # Learned publisher performance for this intent (citation rate / value per dollar)
-    store = get_metrics_store()
-    learned_boost = store.get_learned_domain_boost(sigs["intent"])
-
-    scored = [{**s, **score_source(sigs, s, learned_boost)} for s in SOURCES]
-
-    # Add bidding fields: bid closer to ask (realistic); our_bid = ask × (0.72 + 0.28 × utility)
-    for s in scored:
-        if s["price"] == 0:
-            s["our_bid"] = 0
-            s["bid_decision"] = "buy"
-            s["bid_detail"] = {"formula": "FREE", "utility": s["utility"], "others": [], "percentile": None}
-        else:
-            coef = 0.72 + 0.28 * s["utility"]
-            s["our_bid"] = round(s["price"] * coef, 3)
-            s["bid_decision"] = "buy" if s["our_bid"] >= s["price"] else "pass"
-            # Simulate anonymized other bidders (3–6 bids around our_bid)
-            n_others = random.randint(3, 6)
-            others = [round(s["our_bid"] * (0.75 + 0.5 * random.random()), 3) for _ in range(n_others)]
-            others.sort()
-            median_other = others[len(others) // 2] if others else s["our_bid"]
-            rank = sum(1 for o in others if o < s["our_bid"])
-            pct = round(100 * rank / max(len(others), 1))
-            s["bid_detail"] = {
-                "formula": f"Ask × (0.72 + 0.28 × utility)",
-                "utility": round(s["utility"], 3),
-                "utility_pct": round(100 * s["utility"]),
-                "n_others": n_others,
-                "median_other": median_other,
-                "percentile": pct,
-            }
-
-    # GATE 1: Eligibility (hard filters)
-    eligible, ineligible = [], []
-    intent = sigs["intent"]
-    for s in scored:
-        reasons = []
-        if s["freshH"] > sigs["maxFreshnessHours"]:
-            reasons.append("too_stale")
-        if s["utility"] < sigs["qualityThreshold"] - 0.12:
-            reasons.append("low_utility")
-        # breaking_news: require topic overlap with news/current events (exclude tech/academic-only)
-        if intent == "breaking_news" and s.get("semantic", 0) < 0.35:
-            reasons.append("low_utility")
-        if reasons:
-            ineligible.append({**s, "reason": reasons[0]})
-        else:
-            eligible.append(s)
-
-    # GATE 2: Value rank among eligible
-    eligible.sort(key=lambda s: s["utility"] / max(s["price"], 0.01), reverse=True)
-
-    # GATE 3: Select with diversity
-    selected, rejected = [], []
-    spent      = 0.0
-    used_types = set()
-    used_names = set()
-
-    for c in eligible:
-        if spent + c["price"] > budget:
-            rejected.append({**c, "reason": "over_budget"})
-            continue
-        redundant = any(
-            (c["name"] == a and b in used_names) or (c["name"] == b and a in used_names)
-            for a, b in REDUNDANT
-        )
-        if redundant:
-            rejected.append({**c, "reason": "redundant"})
-            continue
-        dup_type = c["type"] != "free" and c["type"] in used_types and len(selected) >= sigs["minSources"]
-        if dup_type:
-            rejected.append({**c, "reason": "dup_tier"})
-            continue
-        selected.append(c)
-        spent += c["price"]
-        used_types.add(c["type"])
-        used_names.add(c["name"])
-        if len(selected) >= max(sigs["minSources"] + 1, 2):
+    valyu_probes_used = 0
+    for sq in sub_queries:
+        sq_query = sq["query"]
+        if time.time() > deadline:
             break
+        signals = _infer_signals(sq_query, sq.get("goal", ""))
+        sq_with_signals.append((sq, signals))
+        provider_used = "Brave"
+        free = _brave_search(sq_query, count=BRAVE_WEB_RESULT_COUNT)
+        if not free:
+            # fallback chain from existing provider helper
+            fallback, provider_used = fetch_search_results(sq_query, num=BRAVE_WEB_RESULT_COUNT)
+            free = [{"title": r.get("title", ""), "url": r.get("link", ""), "snippet": r.get("snippet", ""), "source": r.get("displayLink", ""), "date": None} for r in fallback]
+        search_providers[sq_query] = provider_used
+        for r in free:
+            r["snippet_score"] = _snippet_coverage_score(r, signals)
+            r["rag_score"] = None
+            r["rag_status"] = None
+        enrich_free_results_with_rag(free, sq_query, deadline)
+        free_results[sq_query] = free
+        best_free = max([r.get("coverage_score", 0) for r in free], default=0)
+        if best_free >= signals["quality_threshold"]:
+            probe_results[sq_query] = _empty_probe_record(
+                sq_query, skipped_reason="free_tier_met", attempted=False
+            )
+        elif (
+            best_free < signals["quality_threshold"]
+            and valyu_probes_used < MAX_VALYU_PROBES_PER_REQUEST
+            and time.time() <= deadline
+        ):
+            probe = _probe_valyu(sq_query, signals)
+            probe_results[sq_query] = probe
+            valyu_probes_used += 1
+        else:
+            probe_results[sq_query] = _empty_probe_record(
+                sq_query, skipped_reason="probe_budget_exhausted", attempted=False
+            )
 
-    naive      = sorted(SOURCES, key=lambda s: -s["auth"])[:3]
-    naive_cost = sum(s["price"] for s in naive)
-    naive_q    = sum(s["auth"] for s in naive) / len(naive)
-    smart_q    = sum(s["utility"] for s in selected) / len(selected) if selected else 0
+    free_plan, paid_plan, skipped = [], [], []
+    purchased_urls = set()
+    total_bid = 0.0
+    covered = 0
+
+    for sq, signals in sq_with_signals:
+        sq_query = sq["query"]
+        free = free_results.get(sq_query, [])
+        best_free = max(free, key=lambda r: r.get("coverage_score", 0), default=None)
+        if best_free and best_free.get("coverage_score", 0) >= signals["quality_threshold"]:
+            free_plan.append({
+                "sub_query": sq_query,
+                "source": best_free.get("source") or _domain_to_label(_host_from_url(best_free.get("url", ""))),
+                "url": best_free.get("url", ""),
+                "title": best_free.get("title", ""),
+                "coverage_score": best_free.get("coverage_score", 0),
+            })
+            covered += 1
+            all_candidates.append({
+                "name": best_free.get("source") or _domain_to_label(_host_from_url(best_free.get("url", ""))),
+                "price": 0.0,
+                "utility": min(0.99, best_free.get("coverage_score", 0.5)),
+                "our_bid": 0.0,
+                "bid_decision": "buy",
+                "bid_detail": {"formula": "FREE", "utility": best_free.get("coverage_score", 0.5), "percentile": None},
+                "url": best_free.get("url", ""),
+            })
+            continue
+
+        probe = probe_results.get(sq_query, {})
+        candidates = probe.get("results", [])
+        bid_candidates = []
+        for r in candidates:
+            if r.get("unlocked_at") != "paid":
+                continue
+            bid_eval = _compute_bid(signals, r)
+            bid_candidates.append({**r, **bid_eval})
+        bid_candidates.sort(key=lambda r: -r["relevance_score"])
+
+        bought = False
+        for c in bid_candidates:
+            if c["decision"] == "buy" and c.get("url") not in purchased_urls:
+                paid_plan.append({
+                    "sub_query": sq_query,
+                    "source": c.get("source", ""),
+                    "url": c.get("url", ""),
+                    "title": c.get("title", ""),
+                    "inferred_price": c.get("inferred_price", 0),
+                    "bid": c.get("bid", 0),
+                    "relevance_score": c.get("relevance_score", 0),
+                    "reasoning": c.get("reasoning", ""),
+                })
+                purchased_urls.add(c.get("url"))
+                total_bid += c.get("bid", 0)
+                covered += 1
+                bought = True
+                all_candidates.append({
+                    "name": _domain_to_label(_host_from_url(c.get("url", ""))),
+                    "price": c.get("inferred_price", 0),
+                    "utility": c.get("relevance_score", 0),
+                    "our_bid": c.get("bid", 0),
+                    "bid_decision": c.get("decision", "pass"),
+                    "bid_detail": {"formula": "ceiling × relevance", "utility": c.get("relevance_score", 0), "percentile": None},
+                    "url": c.get("url", ""),
+                })
+                break
+        if not bought:
+            skipped.append({"sub_query": sq_query, "reason": "no adequate source at or below ceiling"})
+
+    naive_total = 0.0
+    for sq, _signals in sq_with_signals:
+        top = probe_results.get(sq["query"], {}).get("results", [])
+        if top:
+            naive_total += min([r.get("inferred_price", 0) for r in top] or [0])
+
+    selected = [c for c in all_candidates if c.get("bid_decision") == "buy"]
+    all_scored = sorted(all_candidates, key=lambda x: x.get("utility", 0), reverse=True)
+    avg_quality = sum(c.get("utility", 0) for c in selected) / len(selected) if selected else 0
+    primary_intent = sq_with_signals[0][1]["intent"] if sq_with_signals else "factual_lookup"
+    avg_quality_threshold = (
+        sum(s[1].get("quality_threshold", 0.7) for s in sq_with_signals) / max(len(sq_with_signals), 1)
+    )
+    # Keep legacy rich signal shape for existing UI render logic.
+    sigs = extract_signals(query)
+    qu = sigs.get("queryUnderstanding") or {}
+    qu["query_cluster"] = primary_intent
+    qu["tier_strategy"] = "v4_decompose_search_probe_synthesize"
+    rules = set(qu.get("routing_rules_fired") or [])
+    rules.update(["decompose", "coverage_gap_detection", "valyu_tier_diff_probe"])
+    qu["routing_rules_fired"] = list(rules)
+    sigs["queryUnderstanding"] = qu
+    sigs["intent"] = primary_intent
+    sigs["qualityThreshold"] = round(avg_quality_threshold, 3)
+    sigs["sub_queries"] = [{"query": sq["query"], "goal": sq["goal"], "signals": sig} for sq, sig in sq_with_signals]
+    sigs["query_fan_out"] = {
+        "rationale": query_fan_out_rationale,
+        "max_queries": 3,
+        "source": (_decomp.get("source") or "local"),
+        "planner_framework": "deep_reasoning_researcher",
+        "planner_framework_url": DEEP_RESEARCH_FRAMEWORK_URL,
+    }
+    bid_ceiling = max([sig["max_price_usd"] for _sq, sig in sq_with_signals] or [0.0])
+
+    # Denominator for coverage must match rows we actually ran (search/RAG/probe), not
+    # len(sub_queries) from decomposition — those can differ if we hit the deadline early.
+    n_subq_processed = len(sq_with_signals)
+    n_subq_planned = len(sub_queries)
+
+    sub_query_runs = []
+    for idx, (sq, signals) in enumerate(sq_with_signals, start=1):
+        sq_query = sq["query"]
+        fr = free_results.get(sq_query, [])
+        best_cov = max((r.get("coverage_score", 0) for r in fr), default=0.0)
+        qth = float(signals.get("quality_threshold", 0) or 0)
+        is_gap = best_cov < qth
+        gap_detail = (
+            f"gap: best free relevance {best_cov:.3f} < quality floor {qth:.3f} "
+            f"(raise hit quality or use paid probe)"
+            if is_gap
+            else f"ok: best free relevance {best_cov:.3f} ≥ floor {qth:.3f}"
+        )
+        free_out = []
+        for r in fr:
+            free_out.append(
+                {
+                    "title": (r.get("title") or "")[:300],
+                    "url": r.get("url") or "",
+                    "snippet": ((r.get("snippet") or "").replace("\n", " "))[:400],
+                    "source": r.get("source") or "",
+                    "date": r.get("date"),
+                    "snippet_score": round(float(r.get("snippet_score", 0) or 0), 4),
+                    "rag_score": r.get("rag_score"),
+                    "rag_status": r.get("rag_status"),
+                    "coverage_score": round(float(r.get("coverage_score", 0) or 0), 4),
+                }
+            )
+        pr = probe_results.get(sq_query, {}) or {}
+        probe_list = pr.get("results") or []
+        probe_out = []
+        for r in probe_list:
+            if not isinstance(r, dict):
+                continue
+            probe_out.append(
+                {
+                    "title": (r.get("title") or "")[:300],
+                    "url": r.get("url") or "",
+                    "snippet": ((r.get("snippet") or "").replace("\n", " "))[:400],
+                    "source": r.get("source") or "",
+                    "date": r.get("date"),
+                    "inferred_price": float(r.get("inferred_price", 0) or 0),
+                    "unlocked_at": r.get("unlocked_at") or "",
+                }
+            )
+        sub_query_runs.append(
+            {
+                "index": idx,
+                "query": sq_query,
+                "goal": sq.get("goal", ""),
+                "intent": signals.get("intent"),
+                "domain": signals.get("domain"),
+                "max_price_usd": round(float(signals.get("max_price_usd", 0) or 0), 4),
+                "search_provider": search_providers.get(sq_query, "—"),
+                "free_results": free_out,
+                "best_coverage": round(float(best_cov), 3),
+                "quality_threshold": round(qth, 3),
+                "coverage_status": "gap" if is_gap else "ok",
+                "coverage_gap_detail": gap_detail,
+                "probe": {
+                    "free_count": int(pr.get("free_count", 0) or 0),
+                    "paid_count": int(pr.get("paid_count", 0) or 0),
+                    "new_at_paid": int(pr.get("new_at_paid", 0) or 0),
+                    "results": probe_out,
+                    "skipped_reason": pr.get("skipped_reason"),
+                    "attempted": pr.get("attempted"),
+                    "valyu_error": pr.get("valyu_error"),
+                    "valyu_only_free_tier": pr.get("valyu_only_free_tier"),
+                    "valyu_proprietary_cpm_used": pr.get("valyu_proprietary_cpm_used"),
+                },
+            }
+        )
+
+    digest = _build_research_digest(sub_query_runs)
+    mean_best = (
+        sum(r.get("best_coverage", 0) or 0 for r in sub_query_runs) / len(sub_query_runs)
+        if sub_query_runs
+        else 0.0
+    )
+    research_completeness = evaluate_research_completeness(
+        query,
+        digest,
+        _instructor_client(),
+        {
+            "n_subqueries": len(sub_query_runs),
+            "subqueries_met_floor": sum(
+                1 for r in sub_query_runs if r.get("coverage_status") == "ok"
+            ),
+            "gap_count": sum(1 for r in sub_query_runs if r.get("coverage_status") == "gap"),
+            "mean_best_relevance": mean_best,
+        },
+    )
+
+    # Visualizable pipeline log (timestamps are synthetic spacing for readability)
+    _tick = [0]
+    _plog_base = datetime.now(timezone.utc)
+    pipeline_log: list = []
+
+    def _plog(msg: str) -> None:
+        ts = (_plog_base + timedelta(seconds=_tick[0])).strftime("%H:%M:%S")
+        _tick[0] += 1
+        pipeline_log.append({"t": ts, "msg": msg})
+
+    _plog("query received")
+    _plog(
+        f"fan-out: {n_subq_planned} planned · {n_subq_processed} processed ({(_decomp.get('source') or 'local')})"
+    )
+    for run in sub_query_runs:
+        _plog(
+            f"sq{run['index']} signals · intent={run.get('intent') or '?'} · "
+            f"domain={run.get('domain') or '?'} · ceiling ${run.get('max_price_usd', 0)}"
+        )
+        _plog(
+            f"sq{run['index']} search ({run['search_provider']}): "
+            f"{len(run['free_results'])} results · best relevance {run['best_coverage']:.2f} → {run['coverage_status']}"
+        )
+        pb = run.get("probe") or {}
+        if int(pb.get("paid_count", 0) or 0) > 0 or int(pb.get("free_count", 0) or 0) > 0:
+            _plog(
+                f"valyu probe sq{run['index']}: free={pb.get('free_count', 0)} "
+                f"paid={pb.get('paid_count', 0)} new@paid={pb.get('new_at_paid', 0)}"
+            )
+    cov_denom = n_subq_processed if n_subq_processed else 0
+    cov_str = f"{covered}/{cov_denom}" if cov_denom else f"{covered}/0"
+    _plog(
+        f"synthesis · coverage {cov_str} · total bid ${round(total_bid, 4)} · "
+        f"vs naive {round((1 - total_bid / naive_total) * 100, 1) if naive_total > 0 else 0}% saved"
+    )
+    rc_mode = research_completeness.get("mode") or "?"
+    rc_pct = research_completeness.get("completeness_percent")
+    rc_need = research_completeness.get("need_more_information")
+    _plog(
+        f"critic ({rc_mode}): completeness {rc_pct}% · need_more={rc_need}"
+    )
+
+    n_runs = len(sub_query_runs)
+    free_ok_n = sum(1 for r in sub_query_runs if r.get("coverage_status") == "ok")
+    gap_n = n_runs - free_ok_n
 
     return {
-        "sigs":       sigs,
-        "selected":   selected,
-        "ineligible": ineligible[:6],
-        "rejected":   rejected[:4],
-        "allScored":  scored,
+        "sigs": sigs,
+        "selected": selected,
+        "ineligible": [],
+        "rejected": skipped,
+        "allScored": all_scored,
         "bid_ceiling": bid_ceiling,
-        "smartCost":  spent,
-        "smartQ":     smart_q,
-        "naiveCost":  naive_cost,
-        "naiveQ":     naive_q,
-        "savings":    naive_cost - spent,
-        "savingsPct": (naive_cost - spent) / naive_cost * 100 if naive_cost > 0 else 0,
+        "smartCost": round(total_bid, 4),
+        "smartQ": round(avg_quality, 4),
+        "naiveCost": round(naive_total, 4),
+        "naiveQ": 0.0,
+        "savings": round(naive_total - total_bid, 4),
+        "savingsPct": round((1 - total_bid / naive_total) * 100, 1) if naive_total > 0 else 0,
         "customer_id": customer_id,
+        "v4": {
+            "free_sources": free_plan,
+            "paid_sources": paid_plan,
+            "skipped": skipped,
+            "coverage": cov_str,
+            "subqueries_planned": n_subq_planned,
+            "subqueries_processed": n_subq_processed,
+            "total_bid": round(total_bid, 4),
+            "naive_total": round(naive_total, 4),
+            "savings_vs_naive": round((1 - total_bid / naive_total) * 100, 1) if naive_total > 0 else 0,
+            "sub_query_runs": sub_query_runs,
+            "query_fan_out_rationale": query_fan_out_rationale,
+            "query_fan_out_source": (_decomp.get("source") or "local"),
+            "pipeline_log": pipeline_log,
+            "pipeline_steps": [
+                {"id": "decomp", "label": "decomp", "status": "done"},
+                {"id": "signals", "label": "signals", "status": "done"},
+                {"id": "search", "label": "search", "status": "done"},
+                {"id": "probe", "label": "probe", "status": "done"},
+                {"id": "synth", "label": "synth", "status": "done"},
+            ],
+            "pipeline_stats": {
+                "subqueries": n_runs,
+                "free_covers": free_ok_n,
+                "gaps": gap_n,
+            },
+            "coverage_policy": COVERAGE_GAP_POLICY,
+            "query_fan_out_reference": QUERY_FAN_OUT_REF,
+            "research_completeness": research_completeness,
+            "deep_research_framework_url": DEEP_RESEARCH_FRAMEWORK_URL,
+            "valyu_configured": _valyu_api_key_present(),
+        },
     }
 
 
@@ -618,7 +1548,20 @@ def optimize_route():
     data = request.get_json() or {}
     query = data.get("query", "")
     customer_id = data.get("customer_id", "default")
-    result = optimize(query, customer_id=customer_id)
+    try:
+        result = optimize(query, customer_id=customer_id)
+    except Exception as e:
+        app.logger.exception("optimize failed")
+        return (
+            jsonify(
+                {
+                    "ok": False,
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                }
+            ),
+            500,
+        )
 
     # Articles to scrape: show every search result (no filter by purchase plan).
     # Each result is turned into an article; catalog domains get name+price, others get domain label + "—".
@@ -638,7 +1581,7 @@ def optimize_route():
     #             )
     #         elif not result["selected_articles"]:
     #             app.logger.info(
-    #                 "Search returned 0 results for %r (provider %s). Tip: set BRAVE_API_KEY in .env for reliable search.",
+    #                 "Search returned 0 results for %r (provider %s). Tip: set DSAIL_BRAVE_API_KEY (or BRAVE_API_KEY) in .env for reliable search.",
     #                 query[:40], provider_used,
     #             )
     #     except Exception as e:
@@ -713,5 +1656,6 @@ if __name__ == "__main__":
     p.add_argument("--port", type=int, default=5001, help="Port (default 5001; macOS often uses 5000 for AirPlay)")
     p.add_argument("--host", default="127.0.0.1", help="Bind host")
     args = p.parse_args()
+    _get_spacy_nlp()
     print(f" * Open in browser: http://{args.host}:{args.port}/")
     app.run(debug=True, host=args.host, port=args.port)

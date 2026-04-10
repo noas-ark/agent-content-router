@@ -30,7 +30,7 @@ Open **http://127.0.0.1:5001**
 
 The Articles to scrape feature (search-backed results) is commented out. No search API keys are required.
 
-To re-enable: uncomment the search block in `app.py` (optimize_route) and the Articles to scrape section in `index.html`. Then you can optionally add `BRAVE_API_KEY` or `GOOGLE_CSE_API_KEY` + `GOOGLE_CSE_CX` in `.env`.
+To re-enable: uncomment the search block in `app.py` (optimize_route) and the Articles to scrape section in `index.html`. Then you can optionally add `DSAIL_BRAVE_API_KEY` (or `BRAVE_API_KEY`) or `GOOGLE_CSE_API_KEY` + `GOOGLE_CSE_CX` in `.env`.
 
 ## API Reference
 
@@ -50,7 +50,7 @@ Endpoints relevant to content routing and bidding:
 |--------------|--------------------------------------------------|
 | `LEARNING_DB` | Path to SQLite DB for learning (default: learning.db) |
 
-No API keys required. Search keys (`BRAVE_API_KEY`, `GOOGLE_CSE_*`) are only needed if you uncomment the search feature.
+No API keys required. Search keys (`DSAIL_BRAVE_API_KEY` or `BRAVE_API_KEY`, `GOOGLE_CSE_*`) are only needed if you uncomment the search feature.
 
 ## Run options
 

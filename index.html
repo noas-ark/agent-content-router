@@ -10,7 +10,8 @@
   :root {
     --bg:#080c10; --surface:#0d1117; --surface2:#161b22; --surface3:#1c2333;
     --border:#21262d; --border2:#30363d;
-    --text:#e6edf3; --text-dim:#8b949e; --text-muted:#484f58;
+    /* Brighter primary + secondary text for dark UI readability */
+    --text:#f7f8fa; --text-dim:#c9d1d9; --text-muted:#8b949e;
     --green:#3fb950; --green-dim:#196c2e;
     --red:#f85149; --yellow:#d29922; --blue:#388bfd; --purple:#bc8cff;
     --accent:#39d353; --accent-dim:rgba(57,211,83,.08);
@@ -20,11 +21,11 @@
     --d-depth:#bc8cff;
   }
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'IBM Plex Mono',monospace;background:var(--bg);color:var(--text);height:100vh;display:flex;flex-direction:column;overflow:hidden}
+  body{font-family:'IBM Plex Mono',monospace;background:var(--bg);color:var(--text);font-size:13px;line-height:1.55;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;height:100vh;display:flex;flex-direction:column;overflow:hidden}
 
   /* TOP BAR */
   .topbar{height:44px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 20px;gap:14px;flex-shrink:0}
-  .logo{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;letter-spacing:.04em}
+  .logo{display:flex;align-items:center;gap:6px;font-size:14px;font-weight:600;letter-spacing:.04em}
   .logo-icon{display:flex;align-items:center;flex-shrink:0}
   .logo-icon img{height:20px;width:auto;display:block;vertical-align:middle}
   .logo .logo-text{color:var(--text)}
@@ -41,23 +42,62 @@
   .query-breakdown{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:12px 14px;margin-bottom:16px}
   .query-breakdown .qb-title{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-muted);margin-bottom:10px;display:flex;align-items:center;gap:6px}
   .query-breakdown .qb-title span:last-child{font-size:8px;font-weight:normal;color:var(--text-muted);opacity:.9}
-  .query-breakdown .qb-row{display:flex;align-items:baseline;gap:8px;margin-bottom:6px;font-size:10px}
+  .query-breakdown .qb-row{display:flex;align-items:baseline;gap:8px;margin-bottom:6px;font-size:11px}
   .query-breakdown .qb-row:last-child{margin-bottom:0}
   .query-breakdown .qb-k{color:var(--text-muted);min-width:120px;flex-shrink:0}
   .query-breakdown .qb-v{color:var(--text);word-break:break-word}
   .query-breakdown .qb-chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
   .query-breakdown .qb-chip{font-size:9px;padding:2px 6px;background:var(--surface3);border:1px solid var(--border2);border-radius:3px;color:var(--text-dim)}
   .query-breakdown .qb-chip.trending{color:var(--yellow);border-color:rgba(210,153,34,.3);background:rgba(210,153,34,.08)}
-  .query-breakdown .qb-intent-list{color:var(--text-dim);font-size:10px;line-height:1.5}
+  .query-breakdown .qb-intent-list{color:var(--text-dim);font-size:11px;line-height:1.5}
 
-  /* LAYOUT — resizable columns via CSS vars */
-  .main{flex:1;display:flex;overflow:hidden;position:relative}
+  /* Decomposed sub-queries (query fanout) */
+  .fanout-block{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:12px 14px;margin-bottom:16px}
+  .fanout-block .fanout-title{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-muted);margin-bottom:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .fanout-block .fanout-badge{font-size:9px;font-weight:600;letter-spacing:.06em;padding:2px 8px;border-radius:10px;background:var(--surface3);border:1px solid var(--border2);color:var(--text-dim)}
+  .fanout-item{border:1px solid var(--border);border-radius:5px;padding:10px 12px;margin-bottom:8px;background:var(--bg)}
+  .fanout-item:last-child{margin-bottom:0}
+  .fanout-item-hd{display:flex;align-items:flex-start;gap:10px}
+  .fanout-idx{flex-shrink:0;width:22px;height:22px;border-radius:50%;background:var(--surface3);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--accent)}
+  .fanout-q{font-size:12px;font-weight:600;color:var(--text);line-height:1.4;margin:0;word-break:break-word}
+  .fanout-goal{font-size:11px;color:var(--text-dim);line-height:1.45;margin-top:6px}
+  .fanout-meta{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+  .fanout-chip{font-size:9px;padding:3px 7px;background:var(--surface3);border:1px solid var(--border2);border-radius:3px;color:var(--text-dim)}
+  .fanout-subhdr{font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);margin:12px 0 6px}
+  .fanout-res-row{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;border-top:1px solid var(--border);padding:10px 0}
+  .fanout-res-row:first-of-type{border-top:none;padding-top:2px}
+  .fanout-res-main{flex:1;min-width:0}
+  .rag-rel-box{
+    flex-shrink:0;width:108px;text-align:right;padding:9px 11px;border-radius:8px;
+    border:1px solid rgba(63,185,80,.4);background:rgba(63,185,80,.1);cursor:help;
+    box-shadow:0 0 0 1px rgba(63,185,80,.06) inset;
+  }
+  .rag-rel-box:hover{border-color:var(--accent);background:var(--accent-dim);box-shadow:0 0 12px rgba(57,211,83,.12)}
+  .rag-rel-lbl{font-size:8px;color:var(--text-muted);letter-spacing:.12em;text-transform:uppercase;margin-bottom:3px}
+  .rag-rel-num{font-size:24px;font-weight:700;color:var(--green);line-height:1;font-family:'IBM Plex Mono',monospace;letter-spacing:-0.03em}
+  .rag-rel-bar{height:6px;background:var(--surface3);border-radius:4px;margin-top:8px;overflow:hidden}
+  .rag-rel-bar > div{height:100%;background:linear-gradient(90deg,var(--green-dim),var(--green));border-radius:4px;transition:width .4s ease}
+  .rag-rel-sub{font-size:8px;color:var(--text-muted);margin-top:5px;line-height:1.3}
+  .fanout-res{border-top:1px solid var(--border);padding:8px 0}
+  .fanout-res:first-of-type{border-top:none;padding-top:2px}
+  .fanout-res-title{font-size:11px;font-weight:500;color:var(--accent);text-decoration:none;display:block;line-height:1.35}
+  .fanout-res-title:hover{text-decoration:underline}
+  .fanout-res-meta{font-size:9px;color:var(--text-muted);margin-top:3px}
+  .fanout-res-snippet{font-size:10px;color:var(--text-dim);margin-top:5px;line-height:1.45}
+  .fanout-nores{font-size:10px;color:var(--text-muted);padding:4px 0 8px}
+  .fanout-status-gap{color:var(--yellow)!important;border-color:rgba(210,153,34,.35)!important;background:rgba(210,153,34,.08)!important}
+  .fanout-status-ok{color:var(--green)!important;border-color:rgba(63,185,80,.35)!important;background:rgba(63,185,80,.08)!important}
+  .fanout-rationale{font-size:11px;color:var(--text-dim);line-height:1.5;margin-bottom:12px;padding:10px 12px;background:var(--bg);border:1px solid var(--border);border-radius:5px;border-left:3px solid var(--accent)}
+  .fanout-rationale .fanout-rationale-hd{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px}
+  .fanout-src{font-size:9px;color:var(--text-muted);margin-top:4px}
+
+  /* LAYOUT — two columns: fixed query rail + detail fills remaining width (no empty 3rd column) */
+  .main{flex:1;display:flex;overflow:hidden;position:relative;width:100%;min-width:0}
   .panel{flex:0 0 auto;width:var(--col-width, 280px);min-width:160px;max-width:600px;display:flex;flex-direction:column;overflow:hidden;border-right:1px solid var(--border)}
-  .panel.panel-mid{flex:1 1 0;min-width:200px;width:auto}
-  .panel.panel-right{flex:1 1 0;min-width:200px;max-width:none;border-right:none}
+  .panel.panel-detail{flex:1 1 0%;min-width:260px;width:auto;max-width:none;border-right:none}
   .resize-handle{width:6px;flex-shrink:0;cursor:col-resize;background:transparent;transition:background .15s}
   .resize-handle:hover,.resize-handle.dragging{background:var(--accent-dim)}
-  .ph{height:34px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 14px;gap:7px;font-size:10px;color:var(--text-dim);letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
+  .ph{height:34px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 14px;gap:7px;font-size:11px;color:var(--text-dim);letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
   .ph-dot{width:6px;height:6px;border-radius:50%;background:var(--text-muted)}
   .ph-dot.on{background:var(--accent);box-shadow:0 0 5px var(--accent)}
   .pb{flex:1;overflow-y:auto;padding:14px}
@@ -65,24 +105,27 @@
   ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
 
   /* INPUTS */
-  .lbl{font-size:9px;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px;margin-top:13px}
+  .lbl{font-size:10px;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px;margin-top:13px}
   .lbl:first-child{margin-top:0}
-  textarea{width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:5px;color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:12px;line-height:1.65;padding:14px;resize:vertical;outline:none;transition:border-color .15s;min-height:160px}
+  textarea{width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:5px;color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:13px;line-height:1.65;padding:14px;resize:vertical;outline:none;transition:border-color .15s;min-height:160px}
   textarea:focus{border-color:var(--accent)}
   textarea::placeholder{color:var(--text-muted)}
-  .run-btn{width:100%;margin-top:13px;padding:10px;background:var(--accent);color:#000;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;letter-spacing:.08em;border:none;border-radius:5px;cursor:pointer;transition:all .15s;text-transform:uppercase}
+  .run-row{display:flex;align-items:stretch;gap:10px;margin-top:13px}
+  .run-btn{flex:1;min-width:0;margin-top:0;padding:10px;background:var(--accent);color:#000;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;letter-spacing:.08em;border:none;border-radius:5px;cursor:pointer;transition:all .15s;text-transform:uppercase}
   .run-btn:hover{background:#58e86a;transform:translateY(-1px)}
   .run-btn.loading{background:var(--surface3);color:var(--text-muted);cursor:not-allowed;transform:none}
+  .examples-inline{flex-shrink:0;display:flex;flex-direction:column;align-items:stretch;justify-content:stretch;width:112px;min-width:108px}
+  .examples-toggle{width:100%;height:100%;min-height:40px;padding:8px 6px;margin:0;background:var(--surface2);border:1px solid var(--border2);border-radius:5px;color:var(--text-dim);font-size:10px;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;font-family:'IBM Plex Mono',monospace;transition:color .15s,border-color .15s,background .15s;display:flex;align-items:center;justify-content:center;gap:5px}
+  .examples-toggle:hover{color:var(--text);border-color:var(--accent);background:var(--accent-dim)}
+  .examples-toggle.open{color:var(--accent);border-color:rgba(57,211,83,.35)}
+  .chips-wrap{margin-top:8px}
   .divider{height:1px;background:var(--border);margin:12px 0}
   .sc-chip{padding:7px 9px;background:var(--surface2);border:1px solid var(--border2);border-radius:4px;font-size:10px;color:var(--text-dim);cursor:pointer;transition:all .15s;line-height:1.4;margin-bottom:5px}
   .sc-chip:hover{border-color:var(--accent);color:var(--text);background:var(--accent-dim)}
   .sc-tag{font-size:8px;color:var(--text-muted);letter-spacing:.08em;text-transform:uppercase;margin-bottom:2px}
-  .toggle-btn{display:flex;align-items:center;gap:6px;width:100%;padding:6px 0;font-size:9px;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase;background:none;border:none;cursor:pointer;font-family:'IBM Plex Mono',monospace;transition:color .15s}
-  .toggle-btn:hover{color:var(--text-dim)}
-  .toggle-btn .caret{font-size:8px;transition:transform .2s ease}
-  .toggle-btn .caret{display:inline-block}
-  .toggle-btn:not(.open) .caret{transform:rotate(-90deg)}
-  .toggle-btn.open .caret{transform:rotate(0deg)}
+  .toggle-btn .caret{font-size:8px;transition:transform .2s ease;display:inline-block}
+  .examples-toggle:not(.open) .caret{transform:rotate(-90deg)}
+  .examples-toggle.open .caret{transform:rotate(0deg)}
 
   /* SIGNAL ROWS */
   .dim-section{margin-bottom:20px}
@@ -93,7 +136,7 @@
 
   .sig-row{display:grid;grid-template-columns:1fr 120px 52px;align-items:center;gap:8px;margin-bottom:8px;padding:5px 0;border-bottom:1px solid var(--border)}
   .sig-row:last-child{border-bottom:none}
-  .sig-name{font-size:10px;color:var(--text);font-weight:500}
+  .sig-name{font-size:11px;color:var(--text);font-weight:500}
   .sig-source{font-size:8px;color:var(--text-muted);margin-top:1px}
   .bar-wrap{height:5px;background:var(--surface3);border-radius:3px;overflow:hidden}
   .bar-fill{height:100%;border-radius:3px;transition:width .7s cubic-bezier(.4,0,.2,1)}
@@ -101,7 +144,7 @@
   /* HOVERABLE VALUE */
   .sig-val-wrap{position:relative;display:inline-block}
   .sig-val{
-    font-size:11px;font-weight:600;cursor:help;
+    font-size:12px;font-weight:600;cursor:help;
     padding:2px 7px;border-radius:3px;
     border:1px solid transparent;
     transition:all .15s;
@@ -114,12 +157,13 @@
   .tooltip{
     position:fixed;
     z-index:1000;
-    width:240px;
+    width:300px;
+    max-width:min(300px, 92vw);
     background:#0d1117;
     border:1px solid var(--border2);
     border-radius:6px;
     padding:10px 12px;
-    font-size:10px;
+    font-size:11px;
     line-height:1.65;
     color:var(--text-dim);
     pointer-events:none;
@@ -128,11 +172,11 @@
     box-shadow:0 8px 24px rgba(0,0,0,.6);
   }
   .tooltip.show{opacity:1}
-  .tooltip b{color:var(--text);display:block;margin-bottom:4px;font-size:10px}
+  .tooltip b{color:var(--text);display:block;margin-bottom:4px;font-size:11px}
   .tooltip .t-calc{
     margin-top:6px;padding-top:6px;
     border-top:1px solid var(--border);
-    font-size:9px;color:var(--text-muted);
+    font-size:10px;color:var(--text-muted);
     font-family:'IBM Plex Sans',sans-serif;
   }
   .tooltip .t-val{color:var(--accent);font-weight:600}
@@ -151,7 +195,7 @@
   .src-card.vis{opacity:1;transform:translateX(0)}
   .src-card.sel{border-color:var(--accent);background:var(--accent-dim)}
   .src-card.rej{opacity:.28}
-  .src-n{font-size:11px;font-weight:500}
+  .src-n{font-size:12px;font-weight:500}
   .src-m{font-size:9px;color:var(--text-muted);margin-top:1px}
   .src-bar{height:3px;background:var(--surface3);border-radius:2px;margin-top:5px;overflow:hidden}
   .src-bf{height:100%;border-radius:2px}
@@ -176,19 +220,19 @@
   /* RIGHT PANEL */
   .metric-pair{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:7px}
   .mc{background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:10px 12px}
-  .mc-lbl{font-size:9px;color:var(--text-muted);letter-spacing:.08em;text-transform:uppercase;margin-bottom:3px}
+  .mc-lbl{font-size:10px;color:var(--text-muted);letter-spacing:.08em;text-transform:uppercase;margin-bottom:3px}
   .mc-val{font-size:20px;font-weight:600;line-height:1.1}
-  .mc-sub{font-size:10px;color:var(--text-muted);margin-top:2px}
+  .mc-sub{font-size:11px;color:var(--text-muted);margin-top:2px}
   .savings-wrap{background:var(--surface3);height:6px;border-radius:4px;overflow:hidden;margin:7px 0}
   .savings-fill{height:100%;background:linear-gradient(90deg,var(--green-dim),var(--green));border-radius:4px;width:0%;transition:width .9s cubic-bezier(.4,0,.2,1) .2s}
   .pi{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--accent-dim);border:1px solid rgba(57,211,83,.2);border-radius:4px;margin-bottom:6px;opacity:0;transform:translateY(5px);transition:all .3s}
   .pi.vis{opacity:1;transform:translateY(0)}
-  .pi-name{flex:1;font-size:11px}
+  .pi-name{flex:1;font-size:12px}
   .pi-util{font-size:9px;color:var(--text-muted);background:var(--surface3);padding:2px 5px;border-radius:3px}
-  .pi-price{font-size:11px;font-weight:600;color:var(--accent)}
+  .pi-price{font-size:12px;font-weight:600;color:var(--accent)}
   .roi-card{background:var(--surface2);border:1px solid var(--border2);border-radius:5px;padding:12px;margin-top:7px}
   .roi-hdr{font-size:9px;color:var(--text-muted);letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px}
-  .roi-row{display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--border);font-size:10px}
+  .roi-row{display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--border);font-size:11px}
   .roi-row:last-child{border-bottom:none}
   .roi-row .rl{color:var(--text-dim)}
   .roi-row .rv{color:var(--text);font-weight:500}
@@ -197,9 +241,9 @@
   .intent-badge{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:3px;font-size:9px;font-weight:600;letter-spacing:.1em;text-transform:uppercase}
   .st{font-size:9px;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px;margin-top:14px;display:flex;align-items:center;gap:7px}
   .st::after{content:'';flex:1;height:1px;background:var(--border)}
-  .empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:10px;color:var(--text-muted);font-size:10px;text-align:center;padding:20px}
+  .empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:10px;color:var(--text-dim);font-size:11px;text-align:center;padding:20px}
   .empty-icon{font-size:28px;opacity:.25;margin-bottom:3px}
-  .optimize-loading{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:14px;color:var(--text-muted);font-size:10px;text-align:center;padding:20px}
+  .optimize-loading{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:14px;color:var(--text-dim);font-size:11px;text-align:center;padding:20px}
   .optimize-loading .ol-spinner{width:28px;height:28px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
   .optimize-loading .ol-text{letter-spacing:.06em;opacity:.9}
   @keyframes spin{to{transform:rotate(360deg)}}
@@ -224,10 +268,10 @@
 
   /* BIDDING TAB */
   .right-tabs{display:flex;gap:0;margin-bottom:12px;border-bottom:1px solid var(--border)}
-  .right-tab{padding:6px 12px;font-size:10px;font-weight:500;color:var(--text-muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:color .15s,border-color .15s}
+  .right-tab{padding:6px 12px;font-size:11px;font-weight:500;color:var(--text-muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:color .15s,border-color .15s}
   .right-tab:hover{color:var(--text-dim)}
   .right-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
-  .bid-table{width:100%;font-size:10px;border-collapse:collapse}
+  .bid-table{width:100%;font-size:11px;border-collapse:collapse}
   .bid-table th,.bid-table td{padding:6px 8px;text-align:left;border-bottom:1px solid var(--border)}
   .bid-table th{color:var(--text-muted);font-weight:500;letter-spacing:.05em}
   .bid-table td:nth-child(2),.bid-table td:nth-child(3){font-variant-numeric:tabular-nums}
@@ -236,6 +280,78 @@
   .bid-clickable{cursor:pointer;text-decoration:underline;text-decoration-style:dotted}
   .bid-clickable:hover{color:var(--accent)}
   .bid-ceil{font-size:9px;color:var(--text-muted);margin-bottom:8px}
+
+  /* Pipeline visualization (left + right) */
+  .pipeline-shell{margin-top:10px;padding:10px 0 4px;border-top:1px solid var(--border)}
+  .pipe-steps{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px}
+  .pipe-step{display:inline-flex;align-items:center;gap:4px;padding:4px 7px;border-radius:4px;font-size:9px;letter-spacing:.04em;border:1px solid var(--border2);background:var(--surface2);color:var(--text-muted);transition:background .15s,border-color .15s,color .15s}
+  .pipe-step .pipe-step-num{width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;background:var(--surface3);color:var(--text-dim)}
+  .pipe-step.done{border-color:rgba(63,185,80,.35);color:var(--text-dim);background:rgba(63,185,80,.06)}
+  .pipe-step.done .pipe-step-num{background:rgba(63,185,80,.2);color:var(--green)}
+  .pipe-step.active{border-color:rgba(57,211,83,.5);color:var(--accent);box-shadow:0 0 0 1px rgba(57,211,83,.12)}
+  .pipe-step.active .pipe-step-num{background:var(--accent-dim);color:var(--accent)}
+  .pipe-step.pending{opacity:.55}
+  .pipe-sq-hdr{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);margin:8px 0 6px}
+  .pipe-sq-list{display:flex;flex-direction:column;gap:4px;max-height:220px;overflow-y:auto;margin-bottom:8px}
+  .pipe-sq-item{display:flex;align-items:flex-start;gap:6px;width:100%;text-align:left;padding:7px 8px;border-radius:5px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:10px;cursor:pointer;transition:border-color .15s,background .15s}
+  .pipe-sq-item:hover{border-color:var(--border2);background:var(--surface3)}
+  .pipe-sq-item.pipe-sq-active{border-color:rgba(57,211,83,.45);background:rgba(57,211,83,.08);box-shadow:0 0 0 1px rgba(57,211,83,.1)}
+  .pipe-sq-idx{flex-shrink:0;width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;background:var(--surface3);border:1px solid var(--border2);color:var(--accent)}
+  .pipe-sq-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+  .pipe-sq-q{color:var(--text);line-height:1.35;word-break:break-word}
+  .pipe-sq-meta{font-size:9px;color:var(--text-muted)}
+  .pipe-sq-st{font-size:8px;text-transform:uppercase;letter-spacing:.06em;flex-shrink:0;padding:2px 5px;border-radius:3px}
+  .pipe-sq-gap{color:var(--yellow);background:rgba(210,153,34,.1);border:1px solid rgba(210,153,34,.25)}
+  .pipe-sq-ok{color:var(--green);background:rgba(63,185,80,.08);border:1px solid rgba(63,185,80,.25)}
+  .pipe-stats{font-size:10px;color:var(--text-dim);line-height:1.45;padding:6px 8px;background:var(--bg);border:1px solid var(--border);border-radius:4px}
+  .pipe-stats span{color:var(--accent);font-weight:600}
+  .pipe-progress-wrap{margin-top:10px;display:none;max-width:100%}
+  .pipe-progress-wrap.on{display:block}
+  .pipe-progress-label{font-size:9px;color:var(--text-muted);letter-spacing:.06em;margin-bottom:5px;min-height:14px}
+  .pipe-progress-track{height:6px;background:var(--surface3);border-radius:4px;overflow:hidden;border:1px solid var(--border)}
+  .pipe-progress-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--green-dim),var(--accent));border-radius:3px;transition:width .12s linear}
+  .fanout-search-details{margin-bottom:10px;border:1px solid var(--border);border-radius:6px;background:var(--bg)}
+  .fanout-search-details > summary.fanout-search-sum{cursor:pointer;list-style:none;padding:8px 12px;font-size:10px;color:var(--text-dim);letter-spacing:.06em;display:flex;align-items:center;gap:8px;user-select:none}
+  .fanout-search-details > summary.fanout-search-sum::-webkit-details-marker{display:none}
+  .fanout-search-details > summary.fanout-search-sum::before{content:'▼';font-size:8px;color:var(--accent);transition:transform .15s}
+  .fanout-search-details:not([open]) > summary.fanout-search-sum::before{transform:rotate(-90deg)}
+  .fanout-search-details.fanout-search-sel{border-color:rgba(57,211,83,.5);box-shadow:0 0 0 2px rgba(57,211,83,.1)}
+  .fanout-search-body{padding:0 12px 12px}
+  .fanout-gap-line{font-size:9px;color:var(--text-muted);line-height:1.45;margin:6px 0 10px;padding:6px 8px;background:var(--surface2);border-radius:4px;border-left:3px solid var(--yellow)}
+  .fanout-dr{font-size:9px;color:var(--text-dim);line-height:1.45;margin-bottom:8px;padding:8px 10px;background:rgba(56,139,253,.06);border-radius:5px;border:1px solid rgba(56,139,253,.2)}
+  .fanout-dr a{color:var(--accent)}
+  .fanout-dejan{font-size:9px;color:var(--text-muted);margin-top:8px;line-height:1.5}
+  .fanout-dejan a{color:var(--accent)}
+  .dr-critic-block{margin-bottom:16px;padding:12px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:8px}
+  .dr-critic-row{display:flex;gap:16px;flex-wrap:wrap;margin-top:8px}
+  .dr-critic-metric{cursor:help;min-width:120px;padding:8px 10px;background:var(--bg);border:1px solid var(--border2);border-radius:6px}
+  .dr-critic-metric:hover{border-color:rgba(57,211,83,.35)}
+  .dr-critic-lbl{display:block;font-size:9px;color:var(--text-muted);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px}
+  .dr-critic-val{font-size:18px;font-weight:600;color:var(--accent);font-variant-numeric:tabular-nums}
+  .dr-critic-sum{font-size:10px;color:var(--text-dim);line-height:1.5;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)}
+  .dr-critic-foot{font-size:9px;color:var(--text-muted);margin-top:10px;line-height:1.45}
+  .fanout-item-sel{outline:1px solid rgba(57,211,83,.45);box-shadow:0 0 0 2px rgba(57,211,83,.08);border-radius:5px}
+  .rp-pipeline-block{margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border)}
+  .rp-hdr{font-size:9px;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px}
+  .rp-log{max-height:200px;overflow-y:auto;font-size:10px;line-height:1.5;color:var(--text-dim);padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:5px;margin-bottom:10px}
+  .rp-log-line{margin-bottom:4px}
+  .rp-log-line:last-child{margin-bottom:0}
+  .rp-t{color:var(--text-muted);font-variant-numeric:tabular-nums;margin-right:6px}
+  .rp-syn{font-size:10px;line-height:1.45}
+  .rp-syn-row{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)}
+  .rp-syn-row:last-child{border-bottom:none}
+  .rp-syn-tag{color:var(--green);font-size:9px;font-weight:600}
+  .rp-syn-sum{margin-top:8px;padding-top:8px;border-top:1px solid var(--border);font-size:10px;color:var(--text-dim)}
+  .rp-syn-sum b{color:var(--accent)}
+
+  /* Merged detail column — main tabs */
+  .main-tabbar{display:flex;flex-wrap:wrap;gap:0;align-items:center;border-bottom:1px solid var(--border);background:var(--surface2);padding:0 8px 0 12px;flex-shrink:0}
+  .main-tab{position:relative;padding:11px 14px 10px;font-size:11px;font-weight:500;color:var(--text-muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:color .15s,border-color .15s;font-family:'IBM Plex Mono',monospace;letter-spacing:.02em}
+  .main-tab:hover{color:var(--text-dim)}
+  .main-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+  .main-tab .tab-dot{position:absolute;top:5px;right:2px;width:5px;height:5px;border-radius:50%;background:var(--accent);opacity:0;box-shadow:0 0 6px var(--accent)}
+  .main-tab.active .tab-dot{opacity:1}
+  .main-tab-panel{display:block;min-height:120px}
 </style>
 </head>
 <body>
@@ -246,8 +362,8 @@
 <div class="topbar">
   <div class="logo"><div class="logo-icon"><img src="/static/bootk-logo.svg" alt=""></div><span class="logo-text">bootk.ai</span></div>
   <div class="sep"></div>
-  <span style="font-size:10px;color:var(--text-dim);letter-spacing:.06em">DSP for content</span>
-  <span class="badge">v0.3</span>
+  <span style="font-size:10px;color:var(--text-dim);letter-spacing:.06em">Premium content purchasing for agents</span>
+  <span class="badge">v0.4</span>
   <div class="ml-auto" style="display:flex;align-items:center;gap:14px">
     <a href="/admin" class="admin-link">Admin</a>
     <a href="/api-reference" class="badge api-ref-pill">API Reference</a>
@@ -266,31 +382,34 @@
   <div class="pb">
     <div class="lbl">Query</div>
     <textarea id="qi" rows="8" placeholder="e.g. What exactly did Powell say this morning about rate cuts?"></textarea>
-    <button class="run-btn" id="runBtn" onclick="go()">▶ Optimize</button>
+    <div class="run-row">
+      <button class="run-btn" id="runBtn" onclick="go()">▶ Optimize</button>
+      <div class="examples-inline">
+        <button type="button" class="examples-toggle" id="examplesToggle" onclick="toggleExamples()"><span class="caret">▼</span> Examples</button>
+      </div>
+    </div>
+    <div id="chipsWrap" class="chips-wrap" style="display:none"><div id="chips"></div></div>
     <div class="divider"></div>
-    <button type="button" class="toggle-btn" id="examplesToggle" onclick="toggleExamples()"><span class="caret">▼</span> Examples</button>
-    <div id="chipsWrap" style="display:none"><div id="chips"></div></div>
-  </div>
-</div>
-<div class="resize-handle" id="resize1" data-left="panelLeft" data-right="panelMid" title="Drag to resize"></div>
-<!-- MIDDLE: SIGNAL EXTRACTION -->
-<div class="panel panel-mid" id="panelMid">
-  <div class="ph" id="midPh"></div>
-  <div class="pb" id="midP">
-    <div class="empty">
-      <div class="empty-icon">⬡</div>
-      <div>Run a query to see<br>full signal breakdown<br><br><span style="font-size:9px;opacity:.6">hover any value to see<br>how it was calculated</span></div>
+    <div class="pipe-progress-wrap" id="pipeProgressWrap">
+      <div class="pipe-progress-label" id="pipeProgressLabel">Starting…</div>
+      <div class="pipe-progress-track"><div class="pipe-progress-fill" id="pipeProgressFill"></div></div>
     </div>
   </div>
 </div>
-<div class="resize-handle" id="resize2" data-left="panelMid" data-right="panelRight" title="Drag to resize"></div>
-<!-- RIGHT: PURCHASE PLAN -->
-<div class="panel panel-right" id="panelRight">
-  <div class="ph"><div class="ph-dot" id="rightDot"></div>Purchase Plan</div>
-  <div class="pb" id="rightP">
+<div class="resize-handle" id="resize1" data-left="panelLeft" data-right="panelDetail" title="Drag to resize"></div>
+<!-- DETAIL: tabs = sub-queries · signals · search · probe · plan -->
+<div class="panel panel-detail" id="panelDetail">
+  <div class="main-tabbar" id="mainTabbar">
+    <div class="main-tab active" data-main-tab="subqueries" onclick="switchMainTab('subqueries')">sub-queries<span class="tab-dot"></span></div>
+    <div class="main-tab" data-main-tab="signals" onclick="switchMainTab('signals')">signals<span class="tab-dot"></span></div>
+    <div class="main-tab" data-main-tab="search" onclick="switchMainTab('search')">search<span class="tab-dot"></span></div>
+    <div class="main-tab" data-main-tab="probe" onclick="switchMainTab('probe')">probe<span class="tab-dot"></span></div>
+    <div class="main-tab" data-main-tab="plan" onclick="switchMainTab('plan')">plan<span class="tab-dot"></span></div>
+  </div>
+  <div class="pb" id="detailP">
     <div class="empty">
-      <div class="empty-icon">$</div>
-      <div>Purchase plan will<br>appear here<br><br><span style="font-size:9px;opacity:.6">hover any price to see<br>how it was estimated</span></div>
+      <div class="empty-icon">⬡</div>
+      <div>Run Optimize to see<br>fan-out, signals, search, probe<br><br><span style="font-size:9px;opacity:.6">use tabs above · plan = costs &amp; bids</span></div>
     </div>
   </div>
 </div>
@@ -341,9 +460,9 @@ function showTip(el) {
 
 function positionTip(el) {
   const r = el.getBoundingClientRect();
-  const tw = 240;
   tip.style.visibility = 'hidden';
   tip.style.display = 'block';
+  const tw = tip.offsetWidth || 300;
   const th = tip.offsetHeight || 120;
   tip.style.visibility = '';
   let left = r.right + 10;
@@ -392,7 +511,11 @@ const DIM_META = {
   depth:       {label:"Depth",       color:"var(--d-depth)"},
 };
 
-function pct(v){ return (v*100).toFixed(0)+'%'; }
+function pct(v){
+  const n = Number(v);
+  if (v == null || Number.isNaN(n)) return '0%';
+  return (n * 100).toFixed(0) + '%';
+}
 
 function valColor(v, dimColor){
   return v > .72 ? dimColor : v > .45 ? 'var(--text-dim)' : 'var(--text-muted)';
@@ -431,18 +554,20 @@ function sigRow(label, src, sigObj, dimColor, flag){
 // ═══════════════════════════════════════════════════════════════
 
 function buildSigObjects(sigs) {
-  const {intent, intentScores, entities, matchedTemplate, minSources} = sigs;
-  const R = sigs.relevance;
-  const C = sigs.credibility;
-  const F = sigs.freshness;
-  const D = sigs.depth;
+  if (!sigs) sigs = {};
+  const {intent, intentScores, matchedTemplate, minSources} = sigs;
+  const entities = sigs.entities || [];
+  const R = sigs.relevance || {};
+  const C = sigs.credibility || {};
+  const F = sigs.freshness || {};
+  const D = sigs.depth || {};
 
   return {
     relevance: {
       semantic: {v: R.semantic,
-        tip: `<b>Semantic Match · ${pct(R.semantic)}</b>Query text compared against 6 intent profile vocabularies using keyword cosine similarity.<div class="t-calc">Top intent: <span class="t-val">${intent.replace(/_/g,' ')}</span> (score: ${intentScores[intent].toFixed(3)})<br>Formula: intersection(query_words, profile_words) / √(|query| × |profile|)<br>Scaled: raw×3.8 + 0.22, capped at 0.98</div>`},
+        tip: `<b>Semantic Match · ${pct(R.semantic)}</b>Query text compared against 6 intent profile vocabularies using keyword cosine similarity.<div class="t-calc">Top intent: <span class="t-val">${(intent||'').replace(/_/g,' ')}</span> (score: ${intentScores && intentScores[intent] != null ? intentScores[intent].toFixed(3) : '—'})<br>Formula: intersection(query_words, profile_words) / √(|query| × |profile|)<br>Scaled: raw×3.8 + 0.22, capped at 0.98</div>`},
       entityDensity: {v: R.entityDensity,
-        tip: `<b>Entity Density · ${pct(R.entityDensity)}</b>Named entities detected in query using regex for capitalized tokens.<div class="t-calc">Entities found: <span class="t-val">${entities.length > 0 ? entities.slice(0,5).join(', ') : 'none'}</span><br>Formula: min(entity_count / 7, 1.0)<br>Source: FB paper §3.1 "entity linking" component</div>`},
+        tip: `<b>Entity Density · ${pct(R.entityDensity)}</b>Named entities from spaCy NER (any casing); years only if the model is unavailable.<div class="t-calc">Entities found: <span class="t-val">${entities.length > 0 ? entities.slice(0,5).join(', ') : 'none'}</span><br>Formula: min(entity_count / 7, 1.0)<br>Source: FB paper §3.1 "entity linking" component</div>`},
       specificity: {v: R.specificity,
         tip: `<b>Specificity · ${pct(R.specificity)}</b>How narrow vs. broad the query is. Specific queries justify paying for exact-match content.<div class="t-calc">Markers checked: Q1–Q4, year references, $amounts, %, IPO, CEO, "exactly", "specific"<br>Triggered: <span class="t-val">${R.specificTriggered ? 'yes — scored 0.88' : 'no — scored by length (' + R.wordCount + ' words)'}</span><br>Narrow queries (0.8+) pay for precision; broad queries (0.3–0.5) can use general sources</div>`},
       templateBoost: {v: R.templateBoost,
@@ -464,7 +589,7 @@ function buildSigObjects(sigs) {
       velocity: {v: F.velocity,
         tip: `<b>Velocity / Trending · ${pct(F.velocity)}</b>How time-sensitive is the content? Drives whether we require real-time sources.<div class="t-calc">Real-time keywords: "today", "this morning", "just", "breaking", "right now"<br>Recent keywords: "this week", "latest", "2026", "Q1 2026"<br>Triggered: <span class="t-val">${F.velocityLevel === 'real-time' ? 'REAL-TIME (1.0)' : F.velocityLevel === 'recent' ? 'RECENT (0.74)' : F.velocityLevel === 'archival' ? 'ARCHIVAL (0.12)' : 'neutral (0.38)'}</span><br>Source: FB paper §3.1 "Trending Detection" component</div>`},
       temporalMarkers: {v: F.temporalMarkers,
-        tip: `<b>Temporal Markers · ${pct(F.temporalMarkers)}</b>Explicit time references in the query. More markers = tighter freshness window.<div class="t-calc">Markers extracted: <span class="t-val">${F.timeMarkers.length ? F.timeMarkers.join(', ') : 'none'}</span><br>Formula: velocity + (marker_count × 0.04)<br>Max freshness age derived: <span class="t-val">${F.maxFreshnessHours >= 9999 ? 'unlimited' : F.maxFreshnessHours + ' hours'}</span></div>`},
+        tip: `<b>Temporal Markers · ${pct(F.temporalMarkers)}</b>Explicit time references in the query. More markers = tighter freshness window.<div class="t-calc">Markers extracted: <span class="t-val">${(F.timeMarkers && F.timeMarkers.length) ? F.timeMarkers.join(', ') : 'none'}</span><br>Formula: velocity + (marker_count × 0.04)<br>Max freshness age derived: <span class="t-val">${F.maxFreshnessHours >= 9999 ? 'unlimited' : (F.maxFreshnessHours != null ? F.maxFreshnessHours + ' hours' : '—')}</span></div>`},
       eventUrgency: {v: F.eventUrgency,
         tip: `<b>Event Urgency · ${pct(F.eventUrgency)}</b>Specific time-locked events (earnings, rate decisions, IPOs) that have a hard freshness deadline.<div class="t-calc">Event keywords: earnings, IPO, merger, rate decision, profit warning, "down X%"<br>Triggered: <span class="t-val">${F.eventTriggered ? 'YES — event detected (0.82)' : 'no (0.22)'}</span><br>Events require sources published within the event window, not just recently.</div>`},
       decayRate: {v: F.decayRate,
@@ -488,253 +613,392 @@ function buildSigObjects(sigs) {
   };
 }
 
-function renderMiddle(res){
-  const {sigs, selected, ineligible} = res;
-  const {intent, entities, matchedTemplate} = sigs;
-  const F  = sigs.freshness;
-  const im = INTENT_META[intent]||INTENT_META.explainer;
-  const so = buildSigObjects(sigs);
+function buildRagRelevanceTipHtml(r, subQuery) {
+  const rs = r.rag_score;
+  const st = r.rag_status || '';
+  const ss = r.snippet_score;
+  if (rs != null && st === 'ok') {
+    return (
+      '<b>RAG relevance score</b><div class="t-calc">The <b>sub-query</b> and each <b>page text chunk</b> are embedded with <code>sentence-transformers/all-MiniLM-L6-v2</code>. HTML is fetched (unless paywalled), text is extracted, split into overlapping word chunks (up to 10 per URL).<br><br>We compute <b>cosine similarity</b> between the query vector and each chunk vector, take the <b>maximum</b> over chunks, then map cosine from [-1,1] to [0,1].<br><br><b>Displayed relevance</b> = max(RAG, snippet-based score) so a strong title/snippet still counts.<br><br>Sub-query: <span class="t-val">' +
+      escapeHtml(subQuery || '') +
+      '</span><br>max RAG: <span class="t-val">' +
+      escapeHtml(String(rs)) +
+      '</span>' +
+      (ss != null ? ' · snippet base: <span class="t-val">' + escapeHtml(String(ss)) + '</span>' : '') +
+      '</div>'
+    );
+  }
+  const snippetFormula =
+    '<br><br><b>Snippet score (no full article)</b> combines: entity overlap in title+snippet vs. sub-query entities (40%), temporal signal if a date is present and freshness is required (25%), keyword-hit overlap from routing signals (20%), plus a small base (15%). Values are blended and rounded to [0,1].';
+  if (st === 'skip_paywall') {
+    return (
+      '<b>Snippet-only relevance</b><div class="t-calc">This host is on the soft-paywall skip list; full HTML is not fetched. No RAG over page body.' +
+      snippetFormula +
+      (ss != null ? '<br>Snippet score here: <span class="t-val">' + escapeHtml(String(ss)) + '</span>' : '') +
+      '</div>'
+    );
+  }
+  if (String(st).startsWith('fetch_failed')) {
+    return (
+      '<b>Relevance (full article fetch failed)</b><div class="t-calc">The page could not be downloaded or parsed, so we cannot chunk/embed the body. The displayed number is the <b>snippet-based score only</b> (same formula as paywall skip).' +
+      snippetFormula +
+      '<br>Status: <code>' +
+      escapeHtml(String(st)) +
+      '</code>' +
+      (ss != null ? '<br>Snippet score: <span class="t-val">' + escapeHtml(String(ss)) + '</span>' : '') +
+      '</div>'
+    );
+  }
+  if (st === 'fetch_short' || st === 'no_chunks') {
+    return (
+      '<b>Relevance (thin page)</b><div class="t-calc">Fetched text was too short to form useful chunks; we use the snippet heuristic instead.' +
+      snippetFormula +
+      (ss != null ? '<br>Snippet score: <span class="t-val">' + escapeHtml(String(ss)) + '</span>' : '') +
+      '</div>'
+    );
+  }
+  if (st === 'embed_failed') {
+    return (
+      '<b>Relevance (embedding failed)</b><div class="t-calc">Chunk vectors could not be computed; snippet score is used.' +
+      snippetFormula +
+      (ss != null ? '<br>Snippet score: <span class="t-val">' + escapeHtml(String(ss)) + '</span>' : '') +
+      '</div>'
+    );
+  }
+  return (
+    '<b>Relevance</b><div class="t-calc">RAG status: <code>' +
+    escapeHtml(String(st || '—')) +
+    '</code>. Displayed value is max(available RAG, snippet) when applicable. Raw RAG: ' +
+    (rs != null ? '<span class="t-val">' + escapeHtml(String(rs)) + '</span>' : '—') +
+    '</div>'
+  );
+}
 
-  // Source cards
-  const srcCards = res.allScored.map(s => {
-    const isSel = selected.find(x=>x.name===s.name);
-    const isIne = ineligible.find(x=>x.name===s.name);
-    const isRej = res.rejected.find(x=>x.name===s.name);
-    const reasonLabel = {too_stale:'stale', low_utility:'low util', over_budget:'over budget', redundant:'redundant', dup_tier:'dup tier'}[(isIne||isRej)?.reason]||'';
-    const bColor = isSel ? 'var(--green)' : s.utility>.70 ? 'var(--yellow)' : 'var(--text-muted)';
-
-    // Price tooltip — registered, not stored in attribute
-    const priceTipHtml = '<b>Price: ' + (s.price===0?'FREE':'$'+s.price.toFixed(2)) + '</b>' +
-      'Source: ' + s.priceSource +
-      '<div class="t-calc">' + s.priceDetail + '</div>';
-    const priceTipId = registerTip(priceTipHtml);
-    const priceDisplay = s.price===0
-      ? `<span class="src-price" style="color:var(--green)" data-tipid="${priceTipId}">FREE</span>`
-      : `<span class="src-price" style="color:var(--text)" data-tipid="${priceTipId}">$${s.price.toFixed(2)}</span>`;
-
-    return `
-      <div class="src-card ${isSel?'sel':(isIne||isRej)?'rej':''}">
-        <div>
-          <div class="src-n">${s.name}</div>
-          <div class="src-m">${s.topics.slice(0,2).join(', ')} · ${s.type}${F.required&&s.freshH>sigs.maxFreshnessHours?' · <span style="color:var(--red)">'+s.freshH+'h lag</span>':''}</div>
-          <div class="src-bar"><div class="src-bf" style="width:${pct(s.utility)};background:${bColor}"></div></div>
+function buildResearchCompletenessHtml(res) {
+  const rc = (res.v4 || {}).research_completeness;
+  if (!rc) return '';
+  const tips = rc.tips || {};
+  const pctRaw = rc.completeness_percent;
+  const pct = pctRaw != null && !Number.isNaN(Number(pctRaw)) ? Number(pctRaw).toFixed(1) : '—';
+  const nm = rc.need_more_information === true ? 'Yes' : rc.need_more_information === false ? 'No' : '—';
+  const pctTip = registerTip(
+    '<b>Research completeness (' + pct + '%)</b><div class="t-calc">' +
+      escapeHtml(tips.completeness_percent || '') +
+      '<br><br><b>How this number is computed</b><br>' +
+      escapeHtml(tips.completeness_how || '') +
+      '</div>'
+  );
+  const nmTip = registerTip(
+    '<b>More information needed (' + nm + ')</b><div class="t-calc">' +
+      escapeHtml(tips.need_more || '') +
+      '<br><br><b>How this is decided</b><br>' +
+      escapeHtml(tips.need_more_how || '') +
+      '</div>'
+  );
+  const mode = rc.mode === 'llm' ? 'LLM critic' : 'Heuristic fallback';
+  const modeTip = registerTip(
+    '<b>Critic mode</b><div class="t-calc"><b>LLM critic</b> — gpt-4o-mini scores completeness 0–1 from your original question plus a digest of titles/snippets from free search (same role as the critic node in deep_reasoning_researcher).<br><br><b>Heuristic fallback</b> — used when no OpenAI key is configured or the critic call failed. The percent blends how many sub-queries met their quality floor with the average best-hit relevance; “more info needed” uses gaps plus a low completeness threshold.</div>'
+  );
+  const ref = rc.framework_ref || (res.v4 || {}).deep_research_framework_url || 'https://github.com/themiccc/deep_reasoning_researcher';
+  return `
+    <div class="dr-critic-block">
+      <div class="fanout-title">Research completeness <span class="fanout-badge" data-tipid="${modeTip}" style="cursor:help">${escapeHtml(mode)}</span></div>
+      <p style="font-size:9px;color:var(--text-muted);line-height:1.45;margin:4px 0 0">Evaluates whether gathered search snippets look sufficient · determines if more search is needed (<a href="${escapeHtml(ref)}" target="_blank" rel="noopener">deep_reasoning_researcher</a> critic pattern).</p>
+      <div class="dr-critic-row">
+        <div class="dr-critic-metric" data-tipid="${pctTip}">
+          <span class="dr-critic-lbl">Completeness</span>
+          <span class="dr-critic-val">${escapeHtml(pct)}%</span>
         </div>
-        <div class="src-util">
-          <div class="src-util-val" style="color:${bColor}">${pct(s.utility)}</div>
-          <div class="src-util-lbl">utility</div>
+        <div class="dr-critic-metric" data-tipid="${nmTip}">
+          <span class="dr-critic-lbl">More info needed</span>
+          <span class="dr-critic-val" style="font-size:15px">${escapeHtml(nm)}</span>
         </div>
-        <div class="src-price-wrap">
-          ${priceDisplay}
-          <div class="src-status" style="color:${isSel?'var(--green)':(isIne||isRej)?'#484f58':'var(--text-muted)'}">
-            ${isSel?'✓ selected':reasonLabel||'—'}
+      </div>
+      <div class="dr-critic-sum">${escapeHtml(rc.critic_summary || '')}</div>
+      <div class="dr-critic-foot">Hover the two metrics for plain-English definitions and formulas. We only use the upstream project&apos;s planner + critic ideas—not the full Tavily/LangGraph loop.</div>
+    </div>`;
+}
+
+function buildFanoutSplit(res, sigs) {
+  const v4 = res.v4 || {};
+  const runs = v4.sub_query_runs;
+  const subs = sigs.sub_queries || [];
+  const cov = v4.coverage != null ? String(v4.coverage) : '';
+  const qfo = sigs.query_fan_out || {};
+  const dejanUrl = v4.query_fan_out_reference || 'https://dejan.ai/blog/query-fan-out-prompt/';
+  const drUrl = qfo.planner_framework_url || v4.deep_research_framework_url || 'https://github.com/themiccc/deep_reasoning_researcher';
+  const policyStrip = v4.coverage_policy
+    ? `<div class="fanout-gap-line"><b>Coverage / gap:</b> ${escapeHtml(v4.coverage_policy)}</div>`
+    : '';
+  const rationaleBlock = `
+    <div class="fanout-dr">Targeted search tasks are produced with the <a href="${escapeHtml(drUrl)}" target="_blank" rel="noopener">deep_reasoning_researcher</a> <b>planner</b> pattern (open source)—break the question into distinct web queries; we do not run the rest of that repo&apos;s agent.</div>
+    ${qfo.rationale ? `<div class="fanout-rationale"><div class="fanout-rationale-hd">Planner rationale</div>${escapeHtml(qfo.rationale)}${qfo.source ? `<div class="fanout-src">Decomposition source: ${escapeHtml(String(qfo.source))}</div>` : ''}</div>` : ''}
+    <div class="fanout-dejan">Related ideas: <a href="${escapeHtml(dejanUrl)}" target="_blank" rel="noopener">query fan-out</a> (DEJAN) — prefer one search when enough; add queries only for distinct facets; recency.</div>`;
+
+  if (!Array.isArray(runs) || !runs.length) {
+    if (!Array.isArray(subs) || !subs.length) {
+      return { subqueries: '', search: '', probe: '' };
+    }
+    const cov2 = v4.coverage != null ? String(v4.coverage) : '';
+    const rows = subs.map((sq, i) => {
+      const sg = sq.signals || {};
+      const qt = sg.quality_threshold != null ? (sg.quality_threshold * 100).toFixed(0) + '%' : '—';
+      const mp = sg.max_price_usd != null ? fmt$(sg.max_price_usd) : '—';
+      const intent = sg.intent != null ? String(sg.intent) : '—';
+      const domain = sg.domain != null ? String(sg.domain) : '—';
+      const ctype = sg.content_type_needed != null ? String(sg.content_type_needed) : '';
+      return `
+      <div class="fanout-item" id="fanout-run-${i + 1}" data-sq-index="${i + 1}">
+        <div class="fanout-item-hd">
+          <span class="fanout-idx">${i + 1}</span>
+          <div style="flex:1;min-width:0">
+            <p class="fanout-q">${escapeHtml(sq.query || '')}</p>
+            ${sq.goal ? `<div class="fanout-goal"><span style="color:var(--text-muted);font-size:10px;text-transform:uppercase;letter-spacing:.06em">Goal · </span>${escapeHtml(sq.goal)}</div>` : ''}
+            <div class="fanout-meta">
+              <span class="fanout-chip">intent: ${escapeHtml(intent)}</span>
+              <span class="fanout-chip">domain: ${escapeHtml(domain)}</span>
+              ${ctype ? `<span class="fanout-chip">content: ${escapeHtml(ctype)}</span>` : ''}
+              <span class="fanout-chip">quality floor: ${escapeHtml(qt)}</span>
+              <span class="fanout-chip">ceiling: ${escapeHtml(mp)}</span>
+            </div>
           </div>
         </div>
       </div>`;
-  }).join('');
-
-  document.getElementById('midP').innerHTML = `
-  <div class="fade-in">
-
-    <!-- INTENT -->
-    <div style="margin-bottom:14px">
-      <div style="font-size:9px;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:7px">Intent Detected</div>
-      <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">
-        <span class="intent-badge" style="color:${im.color};background:${im.bg};border:1px solid ${im.color}40">● ${im.label}</span>
-        ${F.required?'<span class="intent-badge" style="color:var(--red);background:rgba(248,81,73,.1);border:1px solid rgba(248,81,73,.2)">⚡ FRESHNESS CRITICAL</span>':''}
-        ${matchedTemplate?`<span class="intent-badge" style="color:var(--text-muted);background:var(--surface3);border:1px solid var(--border2)">${matchedTemplate.label}</span>`:''}
+    }).join('');
+    return {
+      subqueries: `
+    <div class="fanout-block">
+      <div class="fanout-title">
+        Query fanout
+        <span class="fanout-badge">${subs.length} sub-queries</span>
+        ${cov2 ? `<span class="fanout-badge">coverage ${escapeHtml(cov2)}</span>` : ''}
       </div>
-      ${entities.length?`<div style="font-size:9px;color:var(--text-muted);margin-top:7px">entities: <span style="color:var(--text-dim)">${entities.slice(0,7).join(', ')}</span></div>`:''}
-    </div>
+      ${rows}
+    </div>`,
+      search: '<div class="fanout-nores" style="padding:10px 0">Brave free-tier hits appear when the response includes <code>sub_query_runs</code>.</div>',
+      probe: '<div class="fanout-nores" style="padding:10px 0">Valyu probe rows appear when the API returns probe data per sub-query.</div>'
+    };
+  }
 
-    <!-- COMPOSED SCORES -->
-    <div style="font-size:9px;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px">Composed Dimension Scores</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:16px">
-      ${Object.entries({relevance:so.relevance.composed,credibility:so.credibility.composed,freshness:so.freshness.composed,depth:so.depth.composed}).map(([k,v])=>{
-        const dm = DIM_META[k];
-        return `<div class="composed-card">
-          <div class="cc-label" style="color:${dm.color}">
-            <span style="width:5px;height:5px;border-radius:50%;background:${dm.color};display:inline-block;flex-shrink:0"></span>
-            ${dm.label}
+  const subParts = [];
+  const searchParts = [];
+  const probeParts = [];
+  runs.forEach((run) => {
+    const sg = (subs.find(s => s.query === run.query) || {}).signals || {};
+    const mp = sg.max_price_usd != null ? fmt$(sg.max_price_usd) : '—';
+    const intent = sg.intent != null ? String(sg.intent) : '—';
+    const domain = sg.domain != null ? String(sg.domain) : '—';
+    const ctype = sg.content_type_needed != null ? String(sg.content_type_needed) : '';
+    const st = run.coverage_status === 'gap' ? 'gap' : 'ok';
+    const stClass = run.coverage_status === 'gap' ? 'fanout-status-gap' : 'fanout-status-ok';
+    const freeList = run.free_results || [];
+    const freeRows = freeList.length ? freeList.map(r => {
+            const rel = r.coverage_score != null ? Number(r.coverage_score) : 0;
+            const covPct = (rel * 100).toFixed(0);
+            const w = Math.min(100, Math.max(0, rel * 100));
+            const ragTipId = registerTip(buildRagRelevanceTipHtml(r, run.query || ''));
+            const sub =
+              r.rag_score != null && r.rag_status === 'ok'
+                ? 'RAG max + snippet'
+                : r.rag_status === 'skip_paywall'
+                  ? 'Snippet only'
+                  : 'Snippet / partial';
+            return `
+        <div class="fanout-res-row">
+          <div class="fanout-res-main">
+            <a class="fanout-res-title" href="${escapeHtml(r.url)}" target="_blank" rel="noopener">${escapeHtml(r.title || '(No title)')}</a>
+            <div class="fanout-res-meta">${escapeHtml(r.source || '—')}</div>
+            ${r.snippet ? `<div class="fanout-res-snippet">${escapeHtml(r.snippet)}</div>` : ''}
           </div>
-          <div class="cc-val" style="color:${dm.color}">${pct(v)}</div>
-          <div style="height:3px;background:var(--surface3);border-radius:2px;margin-top:7px;overflow:hidden">
-            <div style="height:100%;width:${pct(v)};background:${dm.color};border-radius:2px;transition:width .8s .1s"></div>
+          <div class="rag-rel-box" data-tipid="${ragTipId}">
+            <div class="rag-rel-lbl">Relevance</div>
+            <div class="rag-rel-num">${covPct}%</div>
+            <div class="rag-rel-bar"><div style="width:${w.toFixed(1)}%"></div></div>
+            <div class="rag-rel-sub">${escapeHtml(sub)}</div>
           </div>
         </div>`;
-      }).join('')}
-    </div>
+    }).join('') : '<div class="fanout-nores">No free-tier search results for this sub-query.</div>';
+    const pb = run.probe || {};
+    const plist = pb.results || [];
+    const skipped = pb.skipped_reason || null;
+    const attempted = pb.attempted === true;
+    const valyuOk = (res.v4 || {}).valyu_configured === true;
+    const vyuErr = pb.valyu_error;
+    const onlyFree = pb.valyu_only_free_tier === true;
+    let probeHtml = '';
+    if (vyuErr) {
+      probeHtml =
+        '<div class="fanout-nores" style="line-height:1.5">Valyu request failed (the probe ran but the API raised an error).<br><span style="opacity:.85;font-size:10px">' +
+        escapeHtml(String(vyuErr)) +
+        '</span></div>';
+    } else if (plist.length) {
+      const freeTierNote = onlyFree
+        ? '<div class="fanout-nores" style="margin-bottom:10px;line-height:1.45;border-left:2px solid rgba(57,211,83,.45);padding:6px 0 6px 10px">The <b>proprietary</b> Valyu search returned no URLs for this sub-query, but the <b>free index</b> did return matches — so Valyu is working; there is simply nothing extra behind the paid tier to show for this phrasing. (We also avoid <code style="font-size:9px">data_max_price=0</code> on proprietary search so the tier-diff call can return results.)</div>'
+        : '';
+      probeHtml =
+        freeTierNote +
+        `<div class="fanout-subhdr">Valyu probe (tier-diff)</div>
+          <div class="fanout-res-meta" style="margin-bottom:6px">free tier hits: ${pb.free_count} · paid tier hits: ${pb.paid_count} · new at paid: ${pb.new_at_paid}${pb.valyu_proprietary_cpm_used != null ? ' · proprietary CPM cap used: ' + escapeHtml(String(pb.valyu_proprietary_cpm_used)) : ''}</div>
+          ${plist.map(pr => `
+          <div class="fanout-res">
+            <a class="fanout-res-title" href="${escapeHtml(pr.url)}" target="_blank" rel="noopener">${escapeHtml(pr.title || '(No title)')}</a>
+            <div class="fanout-res-meta">${escapeHtml(pr.source || '—')} · ${escapeHtml(pr.unlocked_at || '')}${pr.inferred_price != null ? ' · ~' + fmt$(Number(pr.inferred_price)) : ''}</div>
+            ${pr.snippet ? `<div class="fanout-res-snippet">${escapeHtml(pr.snippet)}</div>` : ''}
+          </div>`).join('')}`;
+    } else if (skipped === 'free_tier_met' || run.coverage_status === 'ok') {
+      probeHtml =
+        '<div class="fanout-nores">Free tier met the quality floor for this sub-query — no Valyu price probe was needed.</div>';
+    } else if (skipped === 'probe_budget_exhausted') {
+      probeHtml =
+        '<div class="fanout-nores">Valyu probe skipped: this Optimize call already ran the maximum number of gap probes (see <code style="font-size:9px">MAX_VALYU_PROBES_PER_REQUEST</code> in the server env). Earlier gap sub-queries used the budget.</div>';
+    } else if (run.coverage_status === 'gap' && attempted && !plist.length) {
+      const counts =
+        (pb.free_count != null ? Number(pb.free_count) : 0) +
+        (pb.paid_count != null ? Number(pb.paid_count) : 0);
+      probeHtml =
+        '<div class="fanout-nores" style="line-height:1.55">Valyu responded, but there were no rows to list after merging tiers (free+proprietary both empty for this sub-query).' +
+        (counts === 0 && valyuOk
+          ? ' Try a shorter query, different keywords, or confirm this topic is in Valyu&apos;s index for the date range you care about.'
+          : '') +
+        (!valyuOk
+          ? ' Set <code style="font-size:9px">VALYU_API_KEY</code> (or <code style="font-size:9px">DSAIL_VALYU_API_KEY</code>) to enable Valyu.'
+          : '') +
+        '</div>';
+    }
+    const bc = run.best_coverage != null ? (run.best_coverage * 100).toFixed(0) : '—';
+    const fl = run.quality_threshold != null ? (run.quality_threshold * 100).toFixed(0) : '—';
+    const gapLine = run.coverage_gap_detail
+      ? `<div class="fanout-gap-line">${escapeHtml(run.coverage_gap_detail)}</div>`
+      : '';
 
-    ${(function(){
-      const qu = sigs.queryUnderstanding;
-      if (!qu) return '';
-      const pi = qu.purchase_intent || {};
-      const entities = qu.entity_linking || [];
-      const rules = qu.routing_rules_fired || [];
-      return `
-    <!-- Query Understanding (FB paper §3.1 style) -->
-    <div class="query-breakdown">
-      <div class="qb-title">Query breakdown <span>· intent → routing → tier</span></div>
-      <div class="qb-row"><span class="qb-k">Content type</span><span class="qb-v">${pi.content_type_needed || '—'}</span></div>
-      <div class="qb-row"><span class="qb-k">Topical domain</span><span class="qb-v">${pi.topical_domain || '—'}</span></div>
-      <div class="qb-row"><span class="qb-k">Freshness need</span><span class="qb-v">${pi.freshness_requirement || '—'}</span></div>
-      <div class="qb-row"><span class="qb-k">Quality floor</span><span class="qb-v">${(pi.quality_threshold != null ? (pi.quality_threshold * 100).toFixed(0) + '%' : '—')}</span></div>
-      <div class="qb-row"><span class="qb-k">Entity linking</span><span class="qb-v">${entities.length ? entities.slice(0,8).join(', ') + (entities.length > 8 ? ' …' : '') : '—'}</span></div>
-      <div class="qb-row"><span class="qb-k">Intent template</span><span class="qb-v">${qu.intent_template || '—'}</span></div>
-      <div class="qb-row"><span class="qb-k">Trending signal</span><span class="qb-v">${qu.trending_signal ? 'yes' : 'no'}</span></div>
-      <div class="qb-row"><span class="qb-k">Query cluster</span><span class="qb-v" style="font-family:'IBM Plex Mono',monospace;font-size:9px">${qu.query_cluster || '—'}</span></div>
-      <div class="qb-row"><span class="qb-k">Tier strategy</span><span class="qb-v">${qu.tier_strategy || '—'}</span></div>
-      ${rules.length ? `<div class="qb-row"><span class="qb-k">Routing rules</span><div class="qb-v"><div class="qb-chips">${rules.map(r=>'<span class="qb-chip">'+r+'</span>').join('')}</div></div></div>` : ''}
-    </div>
-    `;
-    })()}
+    subParts.push(`
+      <div class="fanout-item" id="fanout-run-${run.index}" data-sq-index="${run.index}">
+        <div class="fanout-item-hd">
+          <span class="fanout-idx">${run.index}</span>
+          <div style="flex:1;min-width:0">
+            <p class="fanout-q">${escapeHtml(run.query || '')}</p>
+            ${run.goal ? `<div class="fanout-goal"><span style="color:var(--text-muted);font-size:10px;text-transform:uppercase;letter-spacing:.06em">Goal · </span>${escapeHtml(run.goal)}</div>` : ''}
+            <div class="fanout-meta">
+              <span class="fanout-chip">provider: ${escapeHtml(String(run.search_provider || '—'))}</span>
+              <span class="fanout-chip">best relevance: ${bc}%</span>
+              <span class="fanout-chip">floor: ${fl}%</span>
+              <span class="fanout-chip ${stClass}">${st}</span>
+              <span class="fanout-chip">intent: ${escapeHtml(intent)}</span>
+              <span class="fanout-chip">domain: ${escapeHtml(domain)}</span>
+              ${ctype ? `<span class="fanout-chip">content: ${escapeHtml(ctype)}</span>` : ''}
+              <span class="fanout-chip">ceiling: ${escapeHtml(mp)}</span>
+            </div>
+            ${gapLine}
+          </div>
+        </div>
+      </div>`);
+    const qHead = (run.query || '').length > 90 ? escapeHtml((run.query || '').slice(0, 90)) + '…' : escapeHtml(run.query || '');
+    searchParts.push(`
+      <details class="fanout-search-details" data-sq-index="${run.index}">
+        <summary class="fanout-search-sum">
+          <span class="fanout-idx" style="margin-right:6px">${run.index}</span>
+          <span style="flex:1;min-width:0">${qHead}</span>
+          <span style="color:var(--text-muted);font-size:9px">${freeList.length} hits</span>
+        </summary>
+        <div class="fanout-search-body">
+          ${gapLine}
+          <div class="fanout-subhdr">Hover <b>Relevance</b> for RAG · snippet formula if fetch fails</div>
+          ${freeRows}
+        </div>
+      </details>`);
 
-    <!-- D1: RELEVANCE -->
-    <div class="dim-section">
-      <div class="dim-header">
-        <span class="dim-tag" style="background:rgba(56,139,253,.1);color:var(--d-relevance)">D1 · Relevance</span>
-        <span class="dim-desc">how specific & matched must the content be</span>
-        <span class="dim-composed" style="color:var(--d-relevance)">${pct(so.relevance.composed)}</span>
-      </div>
-      ${sigRow('Semantic Match',       'keyword cosine sim vs. intent profiles',       so.relevance.semantic,      'var(--d-relevance)')}
-      ${sigRow('Entity Density',       'FB §3.1 entity linking · named tokens found',  so.relevance.entityDensity, 'var(--d-relevance)')}
-      ${sigRow('Specificity',          'narrow (high) vs. broad query (low)',           so.relevance.specificity,   'var(--d-relevance)')}
-      ${sigRow('Template Match Boost', 'FB §3.1 intent template · structural pattern', so.relevance.templateBoost, 'var(--d-relevance)', matchedTemplate?{text:matchedTemplate.label,color:'var(--text-dim)',bg:'var(--surface3)'}:null)}
-    </div>
+    const probeBody =
+      probeHtml ||
+      '<div class="fanout-nores">No Valyu probe data for this sub-query.</div>';
+    probeParts.push(`
+      <div class="fanout-item" data-sq-index="${run.index}">
+        <div class="fanout-item-hd">
+          <span class="fanout-idx">${run.index}</span>
+          <div style="flex:1;min-width:0">
+            <p class="fanout-q">${escapeHtml(run.query || '')}</p>
+            ${probeBody}
+          </div>
+        </div>
+      </div>`);
+  });
 
-    <!-- D2: CREDIBILITY -->
-    <div class="dim-section">
-      <div class="dim-header">
-        <span class="dim-tag" style="background:rgba(210,153,34,.1);color:var(--d-credibility)">D2 · Credibility</span>
-        <span class="dim-desc">how authoritative the source must be</span>
-        <span class="dim-composed" style="color:var(--d-credibility)">${pct(so.credibility.composed)}</span>
-      </div>
-      ${sigRow('Stakes Level',      'decision-making vs. info-seeking',     so.credibility.stakes,        'var(--d-credibility)',
-        so.credibility.stakes.v>.80?{text:'HIGH',color:'#f85149',bg:'rgba(248,81,73,.12)'}:
-        so.credibility.stakes.v>.55?{text:'MED', color:'#d29922',bg:'rgba(210,153,34,.12)'}:
-        {text:'LOW',color:'#3fb950',bg:'rgba(63,185,80,.12)'})}
-      ${sigRow('Domain Sensitivity','medical / legal / financial',          so.credibility.sensitivity,   'var(--d-credibility)')}
-      ${sigRow('Corroboration',     'independent sources needed',           so.credibility.corroboration, 'var(--d-credibility)',
-        so.credibility.corroboration.v>.60?{text:`≥${sigs.minSources} sources`,color:'#d29922',bg:'rgba(210,153,34,.12)'}:
-        {text:'1 source',color:'var(--text-muted)',bg:'var(--surface3)'})}
-      ${sigRow('Controversy',       'multiple perspectives required',       so.credibility.controversy,   'var(--d-credibility)')}
-    </div>
+  const coverageBadgeTipId = cov
+    ? registerTip(
+        '<b>Coverage ' +
+          escapeHtml(cov) +
+          '</b><div class="t-calc">This fraction counts <b>sub-queries covered by the plan</b> (best free hit met that sub-query’s quality floor, or we bought a paid hit after probing) out of all sub-queries we ran. It is separate from the Valyu panel: tier-diff probes run only on <b>gap</b> sub-queries (best free relevance below the floor), up to <code>MAX_VALYU_PROBES_PER_REQUEST</code> probes per Optimize.</div>'
+      )
+    : '';
+  const titleRow = (label) => `
+      <div class="fanout-title">
+        ${label}
+        <span class="fanout-badge">${runs.length} sub-queries</span>
+        ${
+          cov
+            ? `<span class="fanout-badge" data-tipid="${coverageBadgeTipId}" style="cursor:help">coverage ${escapeHtml(cov)}</span>`
+            : ''
+        }
+      </div>`;
 
-    <!-- D3: FRESHNESS -->
-    <div class="dim-section">
-      <div class="dim-header">
-        <span class="dim-tag" style="background:rgba(248,81,73,.1);color:var(--d-freshness)">D3 · Freshness</span>
-        <span class="dim-desc">how time-sensitive the content must be${F.required?' · <span style="color:var(--red)">max '+sigs.maxFreshnessHours+'h</span>':''}</span>
-        <span class="dim-composed" style="color:var(--d-freshness)">${pct(so.freshness.composed)}</span>
-      </div>
-      ${sigRow('Velocity / Trending', 'FB §3.1 trending detection · time keywords',  so.freshness.velocity,        'var(--d-freshness)',
-        so.freshness.velocity.v>=.90?{text:'REAL-TIME',color:'#f85149',bg:'rgba(248,81,73,.12)'}:
-        so.freshness.velocity.v>=.60?{text:'RECENT',   color:'#d29922',bg:'rgba(210,153,34,.12)'}:
-        {text:'ARCHIVAL',color:'var(--text-muted)',bg:'var(--surface3)'})}
-      ${sigRow('Temporal Markers',    'extracted time refs: today / Q1 / year',       so.freshness.temporalMarkers, 'var(--d-freshness)',
-        F.timeMarkers.length?{text:F.timeMarkers[0],color:'var(--text-dim)',bg:'var(--surface3)'}:null)}
-      ${sigRow('Event Urgency',       'earnings / rate decision / IPO detected',       so.freshness.eventUrgency,    'var(--d-freshness)')}
-      ${sigRow('Decay Rate',          'how fast this topic type goes stale',           so.freshness.decayRate,       'var(--d-freshness)')}
-    </div>
-
-    <!-- D4: DEPTH -->
-    <div class="dim-section">
-      <div class="dim-header">
-        <span class="dim-tag" style="background:rgba(188,140,255,.1);color:var(--d-depth)">D4 · Depth</span>
-        <span class="dim-desc">novel · not in FB paper or vLLM router</span>
-        <span class="dim-composed" style="color:var(--d-depth)">${pct(so.depth.composed)}</span>
-      </div>
-      ${sigRow('Query Complexity',    'analytical language + query length',            so.depth.complexity,     'var(--d-depth)')}
-      ${sigRow('Answer Depth Req.',   'headline vs. deep-dive needed',                 so.depth.depthRequired,  'var(--d-depth)')}
-      ${sigRow('Question Type',       'Broder 2002 taxonomy (cited in FB paper)',      so.depth.questionType,   'var(--d-depth)',
-        {text:so.depth.questionType.raw||'informational',color:'var(--text-dim)',bg:'var(--surface3)'})}
-      ${sigRow('Ambiguity / Hedge',   'multiple angles needed to resolve',             so.depth.ambiguity,      'var(--d-depth)')}
-    </div>
-
-    <!-- SOURCE SCORING -->
-    <div style="font-size:9px;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px;display:flex;align-items:center;gap:7px">
-      Source Scoring
-      <span style="flex:1;height:1px;background:var(--border)"></span>
-      <span style="font-size:8px;font-weight:normal">hover price for estimation details</span>
-    </div>
-    <div id="srcCards">${srcCards}</div>
-  </div>`;
-
-  setTimeout(()=>{
-    document.querySelectorAll('.src-card').forEach(c=>setTimeout(()=>c.classList.add('vis'),30));
-  },80);
+  return {
+    subqueries: `<div class="fanout-block">${titleRow('Query fanout')}${policyStrip}${rationaleBlock}${subParts.join('')}</div>`,
+    search: `<div class="fanout-block">${titleRow('Brave search (free tier)')}${policyStrip}${searchParts.join('')}</div>`,
+    probe: `<div class="fanout-block">${titleRow('Valyu probe (tier-diff)')}${probeParts.join('')}</div>`
+  };
 }
 
-function escapeHtml(s){
-  if (s == null) return '';
-  const div = document.createElement('div');
-  div.textContent = s;
-  return div.innerHTML;
-}
-function fmt$(n){ return n>=1?'$'+n.toFixed(2):'$'+n.toFixed(3) }
-function fmtBig(n){
-  if(n>=1e9) return '$'+(n/1e9).toFixed(1)+'B';
-  if(n>=1e6) return '$'+(n/1e6).toFixed(1)+'M';
-  if(n>=1e3) return '$'+Math.round(n/1e3)+'K';
-  return '$'+Math.round(n);
-}
-
-let lastRightRes = null;
-
-function renderRight(res){
-  lastRightRes = res;
-  const {sigs, selected, smartCost, smartQ, naiveCost, naiveQ, savings, savingsPct, selected_articles, search_configured, search_provider, bid_ceiling, allScored} = res;
-  const dq = 500000;
-  const articles = selected_articles || [];
+function buildPlanTabHtml(res) {
+  const sigs = res.sigs || {};
+  const selected = res.selected || [];
+  const smartCost = res.smartCost ?? 0;
+  const smartQ = res.smartQ ?? 0;
+  const naiveCost = res.naiveCost ?? 0;
+  const naiveQ = res.naiveQ ?? 0;
+  const savings = res.savings ?? 0;
+  const savingsPct = res.savingsPct ?? 0;
+  const bid_ceiling = res.bid_ceiling;
+  const allScored = res.allScored || [];
 
   const items = selected.map(s=>`
     <div class="pi">
       <div class="pi-name">${s.name}</div>
       <div class="pi-util">${pct(s.utility)}</div>
-      <div class="pi-price">${s.price===0?'FREE':'$'+s.price.toFixed(2)}</div>
+      <div class="pi-price">${(s.price == null || s.price === 0)?'FREE':'$'+Number(s.price).toFixed(2)}</div>
     </div>`).join('');
 
-  const articlesHtml = articles.length
-    ? articles.map(a=>`
-        <div class="article-card">
-          <a href="${a.url}" target="_blank" rel="noopener">${escapeHtml(a.title)}</a>
-          <div class="art-meta"><span>${escapeHtml(a.source_name)}</span><span>${a.price===0?'FREE':a.price!=null?'$'+a.price.toFixed(2):'—'}</span></div>
-          ${a.snippet ? `<div class="art-snippet">${escapeHtml(a.snippet)}</div>` : ''}
-        </div>`).join('')
-    : (search_configured ? '<div style="font-size:10px;color:var(--text-muted);padding:6px 0">No search results for this query. Try a different query or check the search provider.</div>' : '');
-
-  const searchNote = !search_configured
-    ? '<div class="search-unconfigured">Using DuckDuckGo. Set <code>BRAVE_API_KEY</code> or <code>GOOGLE_CSE_API_KEY</code> + <code>GOOGLE_CSE_CX</code> in .env to use another provider.</div>'
-    : '';
-
   const bidRows = (allScored || []).map(s => {
-    const ask = s.price === 0 ? 'FREE' : '$' + s.price.toFixed(2);
-    const bid = s.price === 0 ? '—' : '$' + (s.our_bid != null ? s.our_bid.toFixed(3) : '0');
-    const dec = (s.bid_decision || (s.price === 0 ? 'buy' : (s.our_bid >= s.price ? 'buy' : 'pass')));
+    const askP = Number(s.price);
+    const ask = !Number.isFinite(askP) || askP === 0 ? 'FREE' : '$' + askP.toFixed(2);
+    const bid = !Number.isFinite(askP) || askP === 0 ? '—' : '$' + (s.our_bid != null ? s.our_bid.toFixed(3) : '0');
+    const dec = (s.bid_decision || (!Number.isFinite(askP) || askP === 0 ? 'buy' : (s.our_bid >= askP ? 'buy' : 'pass')));
     const d = s.bid_detail || {};
+    const utilN = Number(s.utility);
     let tipHtml = '';
-    if (s.price === 0) {
+    if (!Number.isFinite(askP) || askP === 0) {
       tipHtml = '<b>FREE source</b><br>Always buy — no bid required.';
     } else {
       tipHtml = '<b>How this bid was calculated</b><br>' +
         'Formula: <code>' + escapeHtml(d.formula || 'Ask × (0.72 + 0.28 × utility)') + '</code><br>' +
         'Your utility: ' + (d.utility_pct != null ? d.utility_pct + '%' : pct(s.utility)) + '<br>' +
-        'Calculation: $' + s.price.toFixed(2) + ' × ' + (0.72 + 0.28 * s.utility).toFixed(2) + ' = $' + (s.our_bid || 0).toFixed(3) + '<br><br>' +
+        'Calculation: $' + askP.toFixed(2) + ' × ' + (0.72 + 0.28 * (Number.isFinite(utilN) ? utilN : 0)).toFixed(2) + ' = $' + (s.our_bid || 0).toFixed(3) + '<br><br>' +
         '<b>Anonymized other bidders</b><br>' +
         (d.n_others ? d.n_others + ' other bid(s) on similar inventory.<br>' : '') +
         (d.median_other != null ? 'Median bid: $' + d.median_other.toFixed(3) + '<br>' : '') +
         (d.percentile != null ? 'You rank in top ' + (100 - d.percentile) + '% of bidders.' : '');
     }
     const tipId = registerTip(tipHtml);
-    const bidCell = s.price === 0
+    const bidCell = !Number.isFinite(askP) || askP === 0
       ? `<td>—</td>`
       : `<td class="bid-clickable" data-tipid="${tipId}" title="Click or hover for calculation details">${bid}</td>`;
     return `<tr><td>${escapeHtml(s.name)}</td><td>${ask}</td>${bidCell}<td class="${dec==='buy'?'dec-buy':'dec-pass'}">${dec}</td></tr>`;
   }).join('');
 
   const bidCeil = bid_ceiling != null ? `Value ceiling: $${bid_ceiling.toFixed(3)} (from stakes + credibility + freshness)` : '';
+  const pipelineRight = buildPipelineRightBlock(res);
 
-  document.getElementById('rightP').innerHTML = `
+  return `
   <div class="fade-in">
+    ${pipelineRight}
     <div class="right-tabs">
       <div class="right-tab active" data-tab="plan" onclick="switchRightTab('plan')">Plan</div>
       <div class="right-tab" data-tab="bidding" onclick="switchRightTab('bidding')">Bidding</div>
@@ -753,24 +1017,18 @@ function renderRight(res){
     </div>
     <div class="mc">
       <div class="mc-lbl">Per-query savings</div>
-      <div class="mc-val" style="color:var(--green)">${fmt$(savings)} <span style="font-size:13px">(${savingsPct.toFixed(0)}%)</span></div>
-      <div class="savings-wrap"><div class="savings-fill" style="width:${Math.min(savingsPct,100)}%"></div></div>
+      <div class="mc-val" style="color:var(--green)">${fmt$(savings)} <span style="font-size:13px">(${Number(savingsPct).toFixed(0)}%)</span></div>
+      <div class="savings-wrap"><div class="savings-fill" style="width:${Math.min(Number(savingsPct) || 0, 100)}%"></div></div>
     </div>
 
     <div style="font-size:9px;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase;margin:12px 0 8px">Purchase Plan</div>
     <div id="piList">${items||'<div style="font-size:10px;color:var(--text-muted);padding:6px 0">No paid sources needed — free sources sufficient</div>'}</div>
 
-    <!-- COMMENTED OUT: Articles to scrape section
-    <div style="font-size:9px;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase;margin:12px 0 8px">Articles to scrape${search_provider ? ' <span style="font-weight:normal;color:var(--text-dim)">(via ' + search_provider + ')</span>' : ''}</div>
-    <div id="articleList">${articlesHtml}</div>
-    ${searchNote}
-    -->
-
     <div style="font-size:9px;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase;margin:12px 0 8px">Signal-Derived Thresholds</div>
     <div style="background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:4px 10px">
-      <div class="roi-row"><span class="rl">Quality floor</span><span class="rv">${pct(sigs.qualityThreshold)} <span style="color:var(--text-muted);font-size:9px">(from credibility)</span></span></div>
-      <div class="roi-row"><span class="rl">Max source age</span><span class="rv">${sigs.maxFreshnessHours>=9999?'unlimited':sigs.maxFreshnessHours+'h'} <span style="color:var(--text-muted);font-size:9px">(from freshness)</span></span></div>
-      <div class="roi-row"><span class="rl">Min sources</span><span class="rv">${sigs.minSources} <span style="color:var(--text-muted);font-size:9px">(from corroboration)</span></span></div>
+      <div class="roi-row"><span class="rl">Quality floor</span><span class="rv">${pct(sigs.qualityThreshold != null ? sigs.qualityThreshold : 0)} <span style="color:var(--text-muted);font-size:9px">(from credibility)</span></span></div>
+      <div class="roi-row"><span class="rl">Max source age</span><span class="rv">${(sigs.maxFreshnessHours != null && sigs.maxFreshnessHours>=9999)?'unlimited':(sigs.maxFreshnessHours != null ? sigs.maxFreshnessHours+'h' : '—')} <span style="color:var(--text-muted);font-size:9px">(from freshness)</span></span></div>
+      <div class="roi-row"><span class="rl">Min sources</span><span class="rv">${sigs.minSources != null ? sigs.minSources : '—'} <span style="color:var(--text-muted);font-size:9px">(from corroboration)</span></span></div>
     </div>
     </div>
     <div id="rightBidContent" class="right-tab-content" style="display:none">
@@ -783,10 +1041,301 @@ function renderRight(res){
       <div style="font-size:9px;color:var(--text-muted);margin-top:12px;line-height:1.5">Our bid = ask × (0.72 + 0.28 × utility). Buy if bid ≥ ask, else pass. Click or hover any bid for calculation details.</div>
     </div>
   </div>`;
+}
+
+let currentMainTab = 'subqueries';
+
+function switchMainTab(tab) {
+  currentMainTab = tab;
+  document.querySelectorAll('.main-tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.mainTab === tab);
+  });
+  const map = { subqueries: 'mtpSubqueries', signals: 'mtpSignals', search: 'mtpSearch', probe: 'mtpProbe', plan: 'mtpPlan' };
+  Object.entries(map).forEach(([k, id]) => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = k === tab ? 'block' : 'none';
+  });
+}
+
+function renderDetail(res) {
+  lastRightRes = res;
+  currentMainTab = 'subqueries';
+  const sigs = res.sigs || {};
+  const {intent, matchedTemplate} = sigs;
+  const entities = Array.isArray(sigs.entities) ? sigs.entities : [];
+  const F  = sigs.freshness || { required: false, timeMarkers: [] };
+  const im = INTENT_META[intent]||INTENT_META.explainer;
+  const so = buildSigObjects(sigs);
+  const fan = buildFanoutSplit(res, sigs);
+
+  const intentBlock = `
+    <div style="margin-bottom:14px">
+      <div style="font-size:9px;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:7px">Intent Detected</div>
+      <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">
+        <span class="intent-badge" style="color:${im.color};background:${im.bg};border:1px solid ${im.color}40">● ${im.label}</span>
+        ${F.required?'<span class="intent-badge" style="color:var(--red);background:rgba(248,81,73,.1);border:1px solid rgba(248,81,73,.2)">⚡ FRESHNESS CRITICAL</span>':''}
+        ${matchedTemplate?`<span class="intent-badge" style="color:var(--text-muted);background:var(--surface3);border:1px solid var(--border2)">${matchedTemplate.label}</span>`:''}
+      </div>
+      ${entities.length?`<div style="font-size:9px;color:var(--text-muted);margin-top:7px">entities: <span style="color:var(--text-dim)">${entities.slice(0,7).join(', ')}</span></div>`:''}
+    </div>`;
+
+  const composedBlock = `
+    <div style="font-size:9px;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px">Composed Dimension Scores</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:16px">
+      ${Object.entries({relevance:so.relevance.composed,credibility:so.credibility.composed,freshness:so.freshness.composed,depth:so.depth.composed}).map(([k,v])=>{
+        const dm = DIM_META[k];
+        return `<div class="composed-card">
+          <div class="cc-label" style="color:${dm.color}">
+            <span style="width:5px;height:5px;border-radius:50%;background:${dm.color};display:inline-block;flex-shrink:0"></span>
+            ${dm.label}
+          </div>
+          <div class="cc-val" style="color:${dm.color}">${pct(v)}</div>
+          <div style="height:3px;background:var(--surface3);border-radius:2px;margin-top:7px;overflow:hidden">
+            <div style="height:100%;width:${pct(v)};background:${dm.color};border-radius:2px;transition:width .8s .1s"></div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`;
+
+  const qbBlock = (function(){
+      const qu = sigs.queryUnderstanding;
+      if (!qu) return '';
+      const pi = qu.purchase_intent || {};
+      const entities = Array.isArray(qu.entity_linking) ? qu.entity_linking : [];
+      const rules = Array.isArray(qu.routing_rules_fired) ? qu.routing_rules_fired : [];
+      return `
+    <div class="query-breakdown">
+      <div class="qb-title">Query breakdown <span>· intent → routing → tier</span></div>
+      <div class="qb-row"><span class="qb-k">Content type</span><span class="qb-v">${pi.content_type_needed || '—'}</span></div>
+      <div class="qb-row"><span class="qb-k">Topical domain</span><span class="qb-v">${pi.topical_domain || '—'}</span></div>
+      <div class="qb-row"><span class="qb-k">Freshness need</span><span class="qb-v">${pi.freshness_requirement || '—'}</span></div>
+      <div class="qb-row"><span class="qb-k">Quality floor</span><span class="qb-v">${(pi.quality_threshold != null ? (pi.quality_threshold * 100).toFixed(0) + '%' : '—')}</span></div>
+      <div class="qb-row"><span class="qb-k">Entity linking</span><span class="qb-v">${entities.length ? entities.slice(0,8).join(', ') + (entities.length > 8 ? ' …' : '') : '—'}</span></div>
+      <div class="qb-row"><span class="qb-k">Intent template</span><span class="qb-v">${qu.intent_template || '—'}</span></div>
+      <div class="qb-row"><span class="qb-k">Trending signal</span><span class="qb-v">${qu.trending_signal ? 'yes' : 'no'}</span></div>
+      <div class="qb-row"><span class="qb-k">Query cluster</span><span class="qb-v" style="font-family:'IBM Plex Mono',monospace;font-size:9px">${qu.query_cluster || '—'}</span></div>
+      <div class="qb-row"><span class="qb-k">Tier strategy</span><span class="qb-v">${qu.tier_strategy || '—'}</span></div>
+      ${rules.length ? `<div class="qb-row"><span class="qb-k">Routing rules</span><div class="qb-v"><div class="qb-chips">${rules.map(r=>'<span class="qb-chip">'+r+'</span>').join('')}</div></div></div>` : ''}
+    </div>
+    `;
+    })();
+
+  const dimBlocks = `
+    <div class="dim-section">
+      <div class="dim-header">
+        <span class="dim-tag" style="background:rgba(56,139,253,.1);color:var(--d-relevance)">D1 · Relevance</span>
+        <span class="dim-desc">how specific & matched must the content be</span>
+        <span class="dim-composed" style="color:var(--d-relevance)">${pct(so.relevance.composed)}</span>
+      </div>
+      ${sigRow('Semantic Match',       'keyword cosine sim vs. intent profiles',       so.relevance.semantic,      'var(--d-relevance)')}
+      ${sigRow('Entity Density',       'FB §3.1 entity linking · spaCy NER (case-insensitive)',  so.relevance.entityDensity, 'var(--d-relevance)')}
+      ${sigRow('Specificity',          'narrow (high) vs. broad query (low)',           so.relevance.specificity,   'var(--d-relevance)')}
+      ${sigRow('Template Match Boost', 'FB §3.1 intent template · structural pattern', so.relevance.templateBoost, 'var(--d-relevance)', matchedTemplate?{text:matchedTemplate.label,color:'var(--text-dim)',bg:'var(--surface3)'}:null)}
+    </div>
+    <div class="dim-section">
+      <div class="dim-header">
+        <span class="dim-tag" style="background:rgba(210,153,34,.1);color:var(--d-credibility)">D2 · Credibility</span>
+        <span class="dim-desc">how authoritative the source must be</span>
+        <span class="dim-composed" style="color:var(--d-credibility)">${pct(so.credibility.composed)}</span>
+      </div>
+      ${sigRow('Stakes Level',      'decision-making vs. info-seeking',     so.credibility.stakes,        'var(--d-credibility)',
+        so.credibility.stakes.v>.80?{text:'HIGH',color:'#f85149',bg:'rgba(248,81,73,.12)'}:
+        so.credibility.stakes.v>.55?{text:'MED', color:'#d29922',bg:'rgba(210,153,34,.12)'}:
+        {text:'LOW',color:'#3fb950',bg:'rgba(63,185,80,.12)'})}
+      ${sigRow('Domain Sensitivity','medical / legal / financial',          so.credibility.sensitivity,   'var(--d-credibility)')}
+      ${sigRow('Corroboration',     'independent sources needed',           so.credibility.corroboration, 'var(--d-credibility)',
+        so.credibility.corroboration.v>.60?{text:`≥${sigs.minSources} sources`,color:'#d29922',bg:'rgba(210,153,34,.12)'}:
+        {text:'1 source',color:'var(--text-muted)',bg:'var(--surface3)'})}
+      ${sigRow('Controversy',       'multiple perspectives required',       so.credibility.controversy,   'var(--d-credibility)')}
+    </div>
+    <div class="dim-section">
+      <div class="dim-header">
+        <span class="dim-tag" style="background:rgba(248,81,73,.1);color:var(--d-freshness)">D3 · Freshness</span>
+        <span class="dim-desc">how time-sensitive the content must be${F.required?' · <span style="color:var(--red)">max '+sigs.maxFreshnessHours+'h</span>':''}</span>
+        <span class="dim-composed" style="color:var(--d-freshness)">${pct(so.freshness.composed)}</span>
+      </div>
+      ${sigRow('Velocity / Trending', 'FB §3.1 trending detection · time keywords',  so.freshness.velocity,        'var(--d-freshness)',
+        so.freshness.velocity.v>=.90?{text:'REAL-TIME',color:'#f85149',bg:'rgba(248,81,73,.12)'}:
+        so.freshness.velocity.v>=.60?{text:'RECENT',   color:'#d29922',bg:'rgba(210,153,34,.12)'}:
+        {text:'ARCHIVAL',color:'var(--text-muted)',bg:'var(--surface3)'})}
+      ${sigRow('Temporal Markers',    'extracted time refs: today / Q1 / year',       so.freshness.temporalMarkers, 'var(--d-freshness)',
+        F.timeMarkers.length?{text:F.timeMarkers[0],color:'var(--text-dim)',bg:'var(--surface3)'}:null)}
+      ${sigRow('Event Urgency',       'earnings / rate decision / IPO detected',       so.freshness.eventUrgency,    'var(--d-freshness)')}
+      ${sigRow('Decay Rate',          'how fast this topic type goes stale',           so.freshness.decayRate,       'var(--d-freshness)')}
+    </div>
+    <div class="dim-section">
+      <div class="dim-header">
+        <span class="dim-tag" style="background:rgba(188,140,255,.1);color:var(--d-depth)">D4 · Depth</span>
+        <span class="dim-desc">novel · not in FB paper or vLLM router</span>
+        <span class="dim-composed" style="color:var(--d-depth)">${pct(so.depth.composed)}</span>
+      </div>
+      ${sigRow('Query Complexity',    'analytical language + query length',            so.depth.complexity,     'var(--d-depth)')}
+      ${sigRow('Answer Depth Req.',   'headline vs. deep-dive needed',                 so.depth.depthRequired,  'var(--d-depth)')}
+      ${sigRow('Question Type',       'Broder 2002 taxonomy (cited in FB paper)',      so.depth.questionType,   'var(--d-depth)',
+        {text:so.depth.questionType.raw||'informational',color:'var(--text-dim)',bg:'var(--surface3)'})}
+      ${sigRow('Ambiguity / Hedge',   'multiple angles needed to resolve',             so.depth.ambiguity,      'var(--d-depth)')}
+    </div>`;
+
+  const signalsPanel = `<div class="fade-in">${intentBlock}${composedBlock}${qbBlock}${dimBlocks}</div>`;
+
+  const subPanel = (buildResearchCompletenessHtml(res) || '') + (fan.subqueries || '<div class="fanout-nores">No fan-out data in this response.</div>');
+  const searchPanel = `<div class="fade-in">${fan.search || ''}</div>`;
+
+  const probePanel = `<div class="fade-in">${fan.probe || '<div class="fanout-nores">No probe data.</div>'}</div>`;
+  const planPanel = buildPlanTabHtml(res);
+
+  document.getElementById('detailP').innerHTML = `
+  <div class="detail-tab-stack">
+    <div id="mtpSubqueries" class="main-tab-panel">${subPanel}</div>
+    <div id="mtpSignals" class="main-tab-panel" style="display:none">${signalsPanel}</div>
+    <div id="mtpSearch" class="main-tab-panel" style="display:none">${searchPanel}</div>
+    <div id="mtpProbe" class="main-tab-panel" style="display:none">${probePanel}</div>
+    <div id="mtpPlan" class="main-tab-panel" style="display:none">${planPanel}</div>
+  </div>`;
+
+  switchMainTab(currentMainTab);
 
   setTimeout(()=>{
     document.querySelectorAll('.pi').forEach(el=>setTimeout(()=>el.classList.add('vis'),50));
-  },100);
+  },80);
+}
+
+function escapeHtml(s){
+  if (s == null) return '';
+  const div = document.createElement('div');
+  div.textContent = s;
+  return div.innerHTML;
+}
+function fmt$(n){
+  if (n == null || n === '') return '—';
+  const x = Number(n);
+  if (Number.isNaN(x)) return '—';
+  return x >= 1 ? '$' + x.toFixed(2) : '$' + x.toFixed(3);
+}
+function fmtBig(n){
+  if(n>=1e9) return '$'+(n/1e9).toFixed(1)+'B';
+  if(n>=1e6) return '$'+(n/1e6).toFixed(1)+'M';
+  if(n>=1e3) return '$'+Math.round(n/1e3)+'K';
+  return '$'+Math.round(n);
+}
+
+let lastRightRes = null;
+let lastOptimizeRes = null;
+let selectedSqIndex = 1;
+
+let optimizeProgressTimer = null;
+
+function startOptimizeProgress(){
+  stopOptimizeProgress(false);
+  const wrap = document.getElementById('pipeProgressWrap');
+  const fill = document.getElementById('pipeProgressFill');
+  const lab = document.getElementById('pipeProgressLabel');
+  if (!wrap || !fill || !lab) return;
+  wrap.classList.add('on');
+  lab.textContent = 'Starting…';
+  fill.style.width = '3%';
+  const t0 = Date.now();
+  const labels = ['Decomposing…', 'Signals & routing…', 'Search & RAG…', 'Probes & plan…', 'Finishing…'];
+  const span = 120000;
+  function tick(){
+    const elapsed = Date.now() - t0;
+    const pct = Math.min(97, 3 + (1 - Math.exp(-elapsed / 24000)) * 94);
+    fill.style.width = pct.toFixed(1) + '%';
+    const li = Math.min(labels.length - 1, Math.floor(elapsed / (span / labels.length)));
+    lab.textContent = labels[li];
+  }
+  tick();
+  optimizeProgressTimer = setInterval(tick, 320);
+}
+
+/** @param {boolean} [done] If true, fill to 100% and label Done (hidden when results render). */
+function stopOptimizeProgress(done){
+  if (optimizeProgressTimer){
+    clearInterval(optimizeProgressTimer);
+    optimizeProgressTimer = null;
+  }
+  const wrap = document.getElementById('pipeProgressWrap');
+  const fill = document.getElementById('pipeProgressFill');
+  const lab = document.getElementById('pipeProgressLabel');
+  if (!wrap || !fill) return;
+  if (done){
+    fill.style.width = '100%';
+    if (lab) lab.textContent = 'Done';
+    return;
+  }
+  wrap.classList.remove('on');
+  fill.style.width = '0%';
+  if (lab) lab.textContent = 'Starting…';
+}
+
+function hidePipeProgress(){
+  const wrap = document.getElementById('pipeProgressWrap');
+  const fill = document.getElementById('pipeProgressFill');
+  const lab = document.getElementById('pipeProgressLabel');
+  if (wrap){
+    wrap.classList.remove('on');
+    if (fill) fill.style.width = '0%';
+    if (lab) lab.textContent = 'Starting…';
+  }
+}
+
+function renderPipelineLoading(){
+  startOptimizeProgress();
+}
+
+function renderPipelineViz(res){
+  hidePipeProgress();
+  lastOptimizeRes = res;
+  const v4 = res.v4 || {};
+  const runs = v4.sub_query_runs;
+  if (Array.isArray(runs) && runs.length) {
+    if (!runs.some(r => r.index === selectedSqIndex)) selectedSqIndex = runs[0].index;
+    selectSubQuery(selectedSqIndex);
+  }
+}
+
+function selectSubQuery(idx){
+  switchMainTab('subqueries');
+  selectedSqIndex = idx;
+  document.querySelectorAll('.fanout-item').forEach(el => {
+    el.classList.toggle('fanout-item-sel', +el.dataset.sqIndex === +idx);
+  });
+  document.querySelectorAll('.fanout-search-details').forEach(el => {
+    el.classList.toggle('fanout-search-sel', +el.dataset.sqIndex === +idx);
+  });
+  const detail = document.getElementById('panelDetail');
+  const target = document.getElementById('fanout-run-' + idx);
+  if (target && detail) {
+    const mr = detail.getBoundingClientRect();
+    const tr = target.getBoundingClientRect();
+    if (tr.top < mr.top || tr.bottom > mr.bottom) target.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+}
+
+function buildPipelineRightBlock(res){
+  const v4 = res.v4 || {};
+  const pl = v4.pipeline_log || [];
+  const fs = v4.free_sources || [];
+  const ps = v4.paid_sources || [];
+  const totalBid = v4.total_bid != null ? v4.total_bid : res.smartCost;
+  const naiveT = v4.naive_total != null ? v4.naive_total : res.naiveCost;
+  const savePct = v4.savings_vs_naive != null ? v4.savings_vs_naive : res.savingsPct;
+  if (!pl.length && !fs.length && !ps.length && !v4.sub_query_runs) return '';
+  let logHtml = '';
+  if (pl.length) {
+    logHtml = `<div class="rp-hdr">Pipeline log</div><div class="rp-log">${pl.map(e => `<div class="rp-log-line"><span class="rp-t">${escapeHtml(e.t || '')}</span>${escapeHtml(e.msg || '')}</div>`).join('')}</div>`;
+  }
+  let synRows = '';
+  fs.forEach(s => {
+    synRows += `<div class="rp-syn-row"><span>${escapeHtml(s.source || s.title || '—')}</span><span class="rp-syn-tag">FREE</span></div>`;
+  });
+  ps.forEach(s => {
+    const b = s.bid != null ? fmt$(s.bid) : '—';
+    synRows += `<div class="rp-syn-row"><span>${escapeHtml(s.source || s.title || '—')}</span><span>${b}</span></div>`;
+  });
+  if (!synRows) synRows = '<div style="font-size:10px;color:var(--text-muted);padding:4px 0">No line items (empty plan)</div>';
+  const synHtml = `<div class="rp-hdr">Synthesis preview</div><div class="rp-syn">${synRows}<div class="rp-syn-sum">Total bid <b>${fmt$(totalBid)}</b> · vs naive ${fmt$(naiveT)} · <b>${(savePct != null ? Number(savePct).toFixed(1) : '0')}%</b> saved</div></div>`;
+  return `<div class="rp-pipeline-block">${logHtml}${synHtml}</div>`;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -796,17 +1345,24 @@ function renderRight(res){
 const MIN_OPTIMIZE_DISPLAY_DELAY_MS = 1200;
 
 function showOptimizeLoading(){
-  document.getElementById('midP').innerHTML = `
+  renderPipelineLoading();
+  document.getElementById('detailP').innerHTML = `
     <div class="optimize-loading">
       <div class="ol-spinner"></div>
-      <div class="ol-text">Analyzing query…</div>
-      <div style="font-size:9px;opacity:.6">extracting signals · scoring sources</div>
+      <div class="ol-text">Running pipeline…</div>
+      <div style="font-size:9px;opacity:.6">decomp · signals · search · probe · plan</div>
     </div>`;
-  document.getElementById('rightP').innerHTML = `
-    <div class="optimize-loading">
-      <div class="ol-spinner"></div>
-      <div class="ol-text">Computing purchase plan…</div>
-      <div style="font-size:9px;opacity:.6">optimizing for quality vs cost</div>
+}
+
+const OPTIMIZE_FETCH_TIMEOUT_MS = 120000;
+
+function showOptimizeFailed(message){
+  stopOptimizeProgress(false);
+  document.getElementById('detailP').innerHTML = `
+    <div class="empty" style="padding:20px 16px">
+      <div class="empty-icon" style="opacity:.45">⚠</div>
+      <div style="max-width:380px;line-height:1.55;font-size:12px;color:var(--text-dim)">${escapeHtml(message)}</div>
+      <div style="font-size:10px;color:var(--text-muted);margin-top:14px;line-height:1.45">If this hangs a long time on first run, the embedding model may be downloading. Set <code style="font-size:9px">BOOTK_DISABLE_RAG=1</code> in <code style="font-size:9px">.env</code> to use snippet-only scoring until the model is cached.</div>
     </div>`;
 }
 
@@ -827,27 +1383,50 @@ async function go(){
   btn.textContent = '⟳ Analyzing…';
   btn.classList.add('loading');
   btn.disabled = true;
-  const midDot = document.getElementById('midDot'); if(midDot) midDot.classList.add('on');
-  document.getElementById('rightDot').classList.add('on');
   showOptimizeLoading();
   const startedAt = Date.now();
+  const ac = new AbortController();
+  const abortTimer = setTimeout(() => ac.abort(), OPTIMIZE_FETCH_TIMEOUT_MS);
   try {
     const resp = await fetch('/optimize', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({query: q})
+      body: JSON.stringify({query: q}),
+      signal: ac.signal
     });
-    const res = await resp.json();
+    clearTimeout(abortTimer);
+    const text = await resp.text();
+    let res;
+    try {
+      res = text ? JSON.parse(text) : {};
+    } catch (parseErr) {
+      throw new Error('Bad response (' + resp.status + '): ' + (text || '').slice(0, 180));
+    }
+    if (!resp.ok) {
+      const msg = (res && (res.error || res.message)) ? String(res.error || res.message) : ('HTTP ' + resp.status);
+      throw new Error(msg);
+    }
+    if (res && res.ok === false && res.error) {
+      throw new Error(String(res.error));
+    }
+    stopOptimizeProgress(true);
     const elapsed = Date.now() - startedAt;
     const wait = Math.max(0, MIN_OPTIMIZE_DISPLAY_DELAY_MS - elapsed);
     await new Promise(r => setTimeout(r, wait));
-    renderMiddle(res);
-    renderRight(res);
+    renderDetail(res);
+    renderPipelineViz(res);
     totalRuns++;
-    sumSavings += res.savingsPct;
+    sumSavings += (res.savingsPct != null ? res.savingsPct : 0);
     document.getElementById('totalRuns').textContent = totalRuns;
     document.getElementById('avgSavings').textContent = Math.round(sumSavings/totalRuns)+'%';
-  } catch(err) { console.error(err); }
+  } catch(err) {
+    console.error(err);
+    clearTimeout(abortTimer);
+    let msg = err && err.name === 'AbortError'
+      ? 'Request timed out after ' + (OPTIMIZE_FETCH_TIMEOUT_MS / 1000) + 's. The server may still be working (RAG fetches + embeddings). Try again, or set BOOTK_DISABLE_RAG=1 while the embedding model downloads.'
+      : (err && err.message) ? err.message : 'Optimize failed.';
+    showOptimizeFailed(msg);
+  }
   finally {
     btn.textContent = '▶ Optimize';
     btn.classList.remove('loading');
@@ -868,9 +1447,13 @@ function initResize(){
         const dx = e2.clientX - startX;
         const w1 = Math.max(160, Math.min(600, startW1 + dx));
         left.style.width = w1 + 'px';
-        if(right.classList.contains('panel-right')) return;
-        const w2 = Math.max(180, Math.min(600, startW2 - dx));
-        right.style.width = w2 + 'px';
+        if (right.classList.contains('panel-right')) {
+          const w2 = Math.max(180, Math.min(600, startW2 - dx));
+          right.style.width = w2 + 'px';
+        } else {
+          /* Detail column flexes to fill the rest — do not set a fixed width (old 3rd-column gap). */
+          right.style.removeProperty('width');
+        }
       }
       function stop(){
         document.removeEventListener('mousemove', move);
@@ -896,6 +1479,7 @@ function toggleExamples(){
 }
 
 function init(){
+  document.getElementById('panelDetail').style.removeProperty('width');
   initResize();
   const chips = document.getElementById('chips');
   SCENARIOS.forEach(s=>{

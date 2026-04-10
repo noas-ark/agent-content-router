@@ -3,7 +3,7 @@ Real-time search integration for the purchase optimizer.
 Maps search result URLs to catalog sources so the purchase plan is backed by actual articles to scrape.
 
 Provider order with fallback (first to return results wins):
-  1) Brave Search — BRAVE_API_KEY
+  1) Brave Search — DSAIL_BRAVE_API_KEY (fallback: BRAVE_API_KEY)
   2) Google Custom Search — GOOGLE_CSE_API_KEY + GOOGLE_CSE_CX
   3) DuckDuckGo — no key (always available)
 """
@@ -19,6 +19,15 @@ try:
     import json as _json
 except ImportError:
     pass
+
+
+def _get_env(*names: str) -> str:
+    """Return the first non-empty env value from names."""
+    for name in names:
+        value = os.environ.get(name, "").strip()
+        if value:
+            return value
+    return ""
 
 
 def _normalize_domain(link: str) -> str:
@@ -167,7 +176,7 @@ def fetch_search_results(query: str, num: int = 12) -> Tuple[List[Dict[str, Any]
     non-empty results wins. Each provider is retried once on failure.
     Returns (list of { title, link, snippet, displayLink }, provider_name).
     """
-    brave_key = os.environ.get("BRAVE_API_KEY", "").strip()
+    brave_key = _get_env("DSAIL_BRAVE_API_KEY", "BRAVE_API_KEY")
     if brave_key:
         results = fetch_brave(query, brave_key, num=num)
         if results:
@@ -189,7 +198,7 @@ def is_search_configured() -> bool:
 
 def get_search_provider_name() -> str:
     """Which provider will be used (for UI or logs)."""
-    if os.environ.get("BRAVE_API_KEY", "").strip():
+    if _get_env("DSAIL_BRAVE_API_KEY", "BRAVE_API_KEY"):
         return "Brave"
     if os.environ.get("GOOGLE_CSE_API_KEY", "").strip() and os.environ.get("GOOGLE_CSE_CX", "").strip():
         return "Google CSE"
