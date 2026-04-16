@@ -25,6 +25,7 @@ from deep_research_tasks import (
     FRAMEWORK_URL as DEEP_RESEARCH_FRAMEWORK_URL,
     evaluate_research_completeness,
     plan_search_tasks,
+    plan_followup_tasks,
 )
 
 logger = logging.getLogger(__name__)
@@ -33,6 +34,8 @@ app = Flask(__name__)
 MAX_OPTIMIZE_SECONDS = float(os.environ.get("MAX_OPTIMIZE_SECONDS", "30"))
 # One Valyu tier-diff probe per gap by default (up to this many per /optimize).
 MAX_VALYU_PROBES_PER_REQUEST = max(1, int(os.environ.get("MAX_VALYU_PROBES_PER_REQUEST", "5")))
+# Max total fanout rounds (1 = no re-fanout; 2 = one follow-up round if critic says need_more).
+MAX_REFANOUT_ROUNDS = max(1, int(os.environ.get("MAX_REFANOUT_ROUNDS", "2")))
 # Brave Web Search API allows up to 20 results per request; was previously hard-coded to 5.
 BRAVE_WEB_RESULT_COUNT = max(1, min(20, int(os.environ.get("BRAVE_WEB_RESULT_COUNT", "20"))))
 COVERAGE_GAP_POLICY = (
@@ -147,11 +150,11 @@ def _search_results_to_articles(search_results: list) -> list:
             source_name = _domain_to_label(host) if host else "Other"
             price = None
         out.append({
-            "title": (r.get("title") or "").strip() or "(No title)",
+            "title": _text_field(r.get("title")) or "(No title)",
             "url": link,
             "source_name": source_name,
             "price": price,
-            "snippet": (r.get("snippet") or "").strip(),
+            "snippet": _text_field(r.get("snippet")),
         })
     return out
 
@@ -823,6 +826,39 @@ def _current_date_str() -> str:
     return datetime.now(timezone.utc).strftime("%B %d, %Y")
 
 
+def _query_complexity(query: str) -> int:
+    """
+    Estimate how many sub-queries are appropriate for a given query.
+    Returns an int in [3, 6]: 3 for simple queries, up to 6 for long multi-facet ones.
+    """
+    words = query.split()
+    word_score = (
+        0 if len(words) <= 8
+        else (1 if len(words) <= 15
+              else (2 if len(words) <= 25
+                    else 3))
+    )
+    entities = _extract_entities_local(query)
+    entity_score = 0 if len(entities) <= 1 else (1 if len(entities) <= 3 else 2)
+    conj = len(re.findall(r"\band\b|\bor\b", query, re.IGNORECASE))
+    extra_q = max(0, query.count("?") - 1)
+    multi_score = min(2, conj + extra_q)
+    total = word_score + entity_score + multi_score
+    return 3 if total <= 1 else (4 if total <= 3 else (5 if total <= 5 else 6))
+
+
+def _local_research_objective(original: str, facet_query: str, facet_goal: str) -> str:
+    """DeepReason-style expanded intent for local decomposition (no LLM)."""
+    o = original.strip()
+    head = o[:420] + ("…" if len(o) > 420 else "")
+    return (
+        f"Support the parent question (“{head}”) by executing this web search. "
+        f"Facet focus: {facet_goal}. "
+        f"Gather verifiable facts, entities, and time-bounded claims from results that would let "
+        f"a researcher answer that question—note how this facet composes with other sub-queries."
+    )
+
+
 def _decompose_query_local(query: str, n: int = 3) -> dict:
     """Heuristic fan-out when Instructor/OpenAI is unavailable (DEJAN-style behavior)."""
     q = query.strip()
@@ -833,18 +869,41 @@ def _decompose_query_local(query: str, n: int = 3) -> dict:
         f"Date context: {date_s}. Original topic: {q[:200]}{'…' if len(q) > 200 else ''}"
     )
     if len(tokens) <= 10:
+        g0 = "Single search covering the full question."
         return {
-            "sub_queries": [{"query": q, "goal": rationale}],
+            "sub_queries": [
+                {
+                    "query": q,
+                    "goal": g0,
+                    "research_objective": _local_research_objective(q, q, g0),
+                }
+            ],
             "rationale": rationale,
             "source": "local",
         }
     chunks = []
     step = max(3, len(tokens) // min(n, max(2, len(tokens) // 4)))
+    facet_i = 0
     for i in range(0, len(tokens), step):
         part = " ".join(tokens[i : i + step]).strip()
         if part:
-            chunks.append({"query": part, "goal": rationale})
-    sub = chunks[:n] or [{"query": q, "goal": rationale}]
+            facet_i += 1
+            g = part if len(part) <= 160 else part[:157] + "…"
+            gl = f"Facet {facet_i}: {g}"
+            chunks.append(
+                {
+                    "query": part,
+                    "goal": gl,
+                    "research_objective": _local_research_objective(q, part, gl),
+                }
+            )
+    sub = chunks[:n] or [
+        {
+            "query": q,
+            "goal": "Single search covering the full question.",
+            "research_objective": _local_research_objective(q, q, "Single search covering the full question."),
+        }
+    ]
     return {"sub_queries": sub, "rationale": rationale, "source": "local"}
 
 
@@ -852,7 +911,7 @@ def _decompose_query(query: str, n: int = 3) -> dict:
     """
     Targeted search tasks via the deep_reasoning_researcher *planner* pattern (distinct web
     queries per facet). Falls back to local heuristics when no LLM.
-    Returns { sub_queries: [{query, goal}], rationale: str, source: str }.
+    Returns { sub_queries: [{query, goal, research_objective}], rationale: str, source: str }.
     """
     client = _instructor_client()
     if client is not None:
@@ -860,6 +919,23 @@ def _decompose_query(query: str, n: int = 3) -> dict:
         if dr:
             return dr
     return _decompose_query_local(query, n=n)
+
+
+def _decompose_followup_queries(
+    original_query: str,
+    already_tried: list[str],
+    n: int = 3,
+) -> dict:
+    """
+    Like _decompose_query but for follow-up rounds — instructs the planner to avoid
+    already-tried queries. Falls back to _decompose_query_local if LLM unavailable.
+    """
+    client = _instructor_client()
+    if client is not None:
+        dr = plan_followup_tasks(original_query, already_tried, n, client)
+        if dr:
+            return dr
+    return _decompose_query_local(original_query, n=n)
 
 
 def _build_research_digest(sub_query_runs: list) -> str:
@@ -872,10 +948,28 @@ def _build_research_digest(sub_query_runs: list) -> str:
         for r in (run.get("free_results") or [])[:10]:
             if not isinstance(r, dict):
                 continue
-            title = (r.get("title") or "")[:220]
-            snip = ((r.get("snippet") or "").replace("\n", " "))[:400]
+            title = _text_field(r.get("title"), 220)
+            snip = _text_field(r.get("snippet"), 400)
             parts.append(f"- {title}\n  {snip}")
     return "\n".join(parts)
+
+
+def _text_field(val, max_len: int | None = None) -> str:
+    """Coerce search/API fields to plain str for JSON/UI. Prevents odd types (e.g. slice) from appearing as text."""
+    if val is None:
+        s = ""
+    elif isinstance(val, slice):
+        s = ""
+    elif isinstance(val, bytes):
+        s = val.decode("utf-8", errors="replace")
+    elif isinstance(val, str):
+        s = val
+    else:
+        s = str(val)
+    s = s.replace("\n", " ").strip()
+    if max_len is not None and len(s) > max_len:
+        s = s[: max_len]
+    return s
 
 
 def _infer_signals(query: str, goal: str) -> dict:
@@ -967,10 +1061,13 @@ def _brave_search(query: str, count=None):
             payload = _json.loads(resp.read().decode())
         results = (payload.get("web") or {}).get("results") or []
         return [{
-            "title": r.get("title", ""),
-            "url": r.get("url", ""),
-            "snippet": r.get("description", ""),
-            "source": ((r.get("profile") or {}).get("name") or _host_from_url(r.get("url", ""))),
+            "title": _text_field(r.get("title"), 800),
+            "url": _text_field(r.get("url"), 4000),
+            "snippet": _text_field(r.get("description"), 8000),
+            "source": _text_field(
+                ((r.get("profile") or {}).get("name") or _host_from_url(r.get("url", ""))),
+                300,
+            ),
             "date": r.get("page_age"),
         } for r in results[:count]]
     except Exception:
@@ -979,7 +1076,7 @@ def _brave_search(query: str, count=None):
 
 def _snippet_coverage_score(result: dict, signals: dict) -> float:
     """Heuristic score from title + snippet only (fallback when RAG fetch unavailable)."""
-    text = f"{result.get('title','')} {result.get('snippet','')}".lower()
+    text = f"{_text_field(result.get('title'))} {_text_field(result.get('snippet'))}".lower()
     entities = signals.get("entities") or []
     entity_cov = (sum(1 for e in entities if str(e).lower() in text) / len(entities)) if entities else 0.5
     keyword_hits = signals.get("keyword_hits") or []
@@ -1014,6 +1111,17 @@ def _infer_price_from_source_url(url: str, cpm_ceiling: int) -> float:
         if d in u:
             return p
     if any(d in u for d in ["wiley.com", "springer.com", "elsevier.com", "nature.com"]):
+        return min(0.05, cpm_ceiling / 1000.0)
+    if any(
+        d in u
+        for d in (
+            "nejm.org",
+            "jamanetwork.com",
+            "thelancet.com",
+            "ahajournals.org",
+            "acc.org",
+        )
+    ):
         return min(0.05, cpm_ceiling / 1000.0)
     return min(0.0015, cpm_ceiling / 1000.0)
 
@@ -1061,21 +1169,22 @@ def _probe_valyu(sub_query: str, signals: dict) -> dict:
     valyu = Valyu(api_key=key)
     raw_ceiling = signals.get("max_price_usd", 0) or 0
     cpm_ceiling = _to_cpm(raw_ceiling)
-    # Proprietary index with data_max_price=0 often returns nothing; use a small floor so tier-diff runs.
+    # Proprietary index with max_price=0 often returns nothing; use a small floor so tier-diff runs.
     cpm_for_proprietary = max(int(cpm_ceiling), 1)
     err_note: str | None = None
     try:
+        # included_sources only applies when signals["valyu_sources"] is non-empty; we do not default to a single publisher.
         free_tier = valyu.search(
             sub_query,
             search_type="all",
-            data_max_price=0,
+            max_price=0,
             max_num_results=5,
             included_sources=signals.get("valyu_sources") or None,
         )
         paid_tier = valyu.search(
             sub_query,
             search_type="proprietary",
-            data_max_price=cpm_for_proprietary,
+            max_price=cpm_for_proprietary,
             max_num_results=5,
             included_sources=signals.get("valyu_sources") or None,
         )
@@ -1100,14 +1209,19 @@ def _probe_valyu(sub_query: str, signals: dict) -> dict:
     out = []
     for r in paid_results:
         url = getattr(r, "url", "")
+        catalog = _infer_price_from_source_url(url, cpm_ceiling)
+        inc = url in new_at_paid
         out.append({
-            "title": getattr(r, "title", ""),
+            "title": _text_field(getattr(r, "title", ""), 800),
             "url": url,
-            "snippet": (getattr(r, "content", "") or "")[:400],
+            "snippet": _text_field(getattr(r, "content", ""), 400),
             "source": _host_from_url(url),
             "date": getattr(r, "publication_date", None),
-            "inferred_price": _infer_price_from_source_url(url, cpm_ceiling) if url in new_at_paid else 0.0,
-            "unlocked_at": "paid" if url in new_at_paid else "free",
+            # Incremental $ only when URL is in proprietary but not in free Valyu index (buy signal).
+            "inferred_price": catalog if inc else 0.0,
+            "estimated_catalog_usd": round(float(catalog), 6),
+            "incremental_paid_only": inc,
+            "unlocked_at": "paid" if inc else "free",
         })
     # We only iterated paid_results above; if proprietary returned nothing but the free index had hits,
     # still surface those so the UI shows Valyu responded (tier-diff just has no paid-only URLs).
@@ -1116,13 +1230,16 @@ def _probe_valyu(sub_query: str, signals: dict) -> dict:
         only_free_fallback = True
         for r in free_results[:5]:
             url = getattr(r, "url", "")
+            catalog = _infer_price_from_source_url(url, cpm_ceiling)
             out.append({
-                "title": getattr(r, "title", ""),
+                "title": _text_field(getattr(r, "title", ""), 800),
                 "url": url,
-                "snippet": (getattr(r, "content", "") or "")[:400],
+                "snippet": _text_field(getattr(r, "content", ""), 400),
                 "source": _host_from_url(url),
                 "date": getattr(r, "publication_date", None),
                 "inferred_price": 0.0,
+                "estimated_catalog_usd": round(float(catalog), 6),
+                "incremental_paid_only": False,
                 "unlocked_at": "free",
             })
     return {
@@ -1148,7 +1265,7 @@ CONTENT_TYPE_MAP = {
 
 
 def _relevance_score(result: dict, signals: dict) -> float:
-    text = f"{result.get('title','')} {result.get('snippet','')}".lower()
+    text = f"{_text_field(result.get('title'))} {_text_field(result.get('snippet'))}".lower()
     entities = signals.get("entities") or []
     entity_cov = (sum(1 for e in entities if str(e).lower() in text) / len(entities)) if entities else 0.5
     src = (result.get("source") or "").lower()
@@ -1177,30 +1294,49 @@ def _compute_bid(signals: dict, result: dict) -> dict:
     }
 
 
-def optimize(query, customer_id="default"):
-    deadline = time.time() + MAX_OPTIMIZE_SECONDS
-    _decomp = _decompose_query(query, n=3)
-    sub_queries = _decomp.get("sub_queries") or []
-    query_fan_out_rationale = (_decomp.get("rationale") or "").strip()
-    sq_with_signals = []
-    free_results = {}
-    probe_results = {}
-    search_providers: dict = {}
-    all_candidates = []
+def _signals_goal_text(sq: dict) -> str:
+    """Text for routing signals: short goal + expanded research objective when present."""
+    g = (sq.get("goal") or "").strip()
+    ro = (sq.get("research_objective") or "").strip()
+    if ro and g:
+        return f"{g}\n\n{ro}"
+    return ro or g
 
-    valyu_probes_used = 0
+
+def _run_fanout_round(
+    sub_queries: list,
+    deadline: float,
+    valyu_probes_used: int,
+) -> tuple:
+    """
+    Execute one round of the fanout loop: signals → search → RAG enrich → Valyu probe.
+    Returns (sq_with_signals, free_results, probe_results, search_providers, valyu_probes_used).
+    """
+    sq_with_signals: list = []
+    free_results: dict = {}
+    probe_results: dict = {}
+    search_providers: dict = {}
+
     for sq in sub_queries:
         sq_query = sq["query"]
         if time.time() > deadline:
             break
-        signals = _infer_signals(sq_query, sq.get("goal", ""))
+        signals = _infer_signals(sq_query, _signals_goal_text(sq))
         sq_with_signals.append((sq, signals))
         provider_used = "Brave"
         free = _brave_search(sq_query, count=BRAVE_WEB_RESULT_COUNT)
         if not free:
-            # fallback chain from existing provider helper
             fallback, provider_used = fetch_search_results(sq_query, num=BRAVE_WEB_RESULT_COUNT)
-            free = [{"title": r.get("title", ""), "url": r.get("link", ""), "snippet": r.get("snippet", ""), "source": r.get("displayLink", ""), "date": None} for r in fallback]
+            free = [
+                {
+                    "title": _text_field(r.get("title"), 800),
+                    "url": _text_field(r.get("link"), 4000),
+                    "snippet": _text_field(r.get("snippet"), 8000),
+                    "source": _text_field(r.get("displayLink"), 300),
+                    "date": None,
+                }
+                for r in fallback
+            ]
         search_providers[sq_query] = provider_used
         for r in free:
             r["snippet_score"] = _snippet_coverage_score(r, signals)
@@ -1225,6 +1361,243 @@ def optimize(query, customer_id="default"):
             probe_results[sq_query] = _empty_probe_record(
                 sq_query, skipped_reason="probe_budget_exhausted", attempted=False
             )
+
+    return sq_with_signals, free_results, probe_results, search_providers, valyu_probes_used
+
+
+def _build_sub_query_runs(
+    sq_with_signals: list,
+    free_results: dict,
+    probe_results: dict,
+    search_providers: dict,
+) -> list:
+    """
+    Build the sub_query_runs list from accumulated fanout state.
+    Indices are 1-based over the full sq_with_signals list.
+    """
+    sub_query_runs = []
+    for idx, (sq, signals) in enumerate(sq_with_signals, start=1):
+        sq_query = sq["query"]
+        fr = free_results.get(sq_query, [])
+        best_cov = max((r.get("coverage_score", 0) for r in fr), default=0.0)
+        qth = float(signals.get("quality_threshold", 0) or 0)
+        is_gap = best_cov < qth
+        gap_detail = (
+            f"gap: best free relevance {best_cov:.3f} < quality floor {qth:.3f} "
+            f"(raise hit quality or use paid probe)"
+            if is_gap
+            else f"ok: best free relevance {best_cov:.3f} ≥ floor {qth:.3f}"
+        )
+        free_out = []
+        for r in fr:
+            free_out.append(
+                {
+                    "title": _text_field(r.get("title"), 300),
+                    "url": r.get("url") or "",
+                    "snippet": _text_field(r.get("snippet"), 400),
+                    "source": _text_field(r.get("source"), 300),
+                    "date": r.get("date"),
+                    "snippet_score": round(float(r.get("snippet_score", 0) or 0), 4),
+                    "rag_score": r.get("rag_score"),
+                    "rag_status": r.get("rag_status"),
+                    "coverage_score": round(float(r.get("coverage_score", 0) or 0), 4),
+                }
+            )
+        pr = probe_results.get(sq_query, {}) or {}
+        probe_list = pr.get("results") or []
+        probe_out = []
+        for r in probe_list:
+            if not isinstance(r, dict):
+                continue
+            probe_out.append(
+                {
+                    "title": _text_field(r.get("title"), 300),
+                    "url": r.get("url") or "",
+                    "snippet": _text_field(r.get("snippet"), 400),
+                    "source": _text_field(r.get("source"), 300),
+                    "date": r.get("date"),
+                    "inferred_price": float(r.get("inferred_price", 0) or 0),
+                    "estimated_catalog_usd": (
+                        round(float(r["estimated_catalog_usd"]), 6)
+                        if "estimated_catalog_usd" in r
+                        else None
+                    ),
+                    "incremental_paid_only": r.get("incremental_paid_only"),
+                    "unlocked_at": r.get("unlocked_at") or "",
+                }
+            )
+        sub_query_runs.append(
+            {
+                "index": idx,
+                "query": sq_query,
+                "goal": sq.get("goal", ""),
+                "research_objective": (sq.get("research_objective") or "").strip(),
+                "intent": signals.get("intent"),
+                "domain": signals.get("domain"),
+                "max_price_usd": round(float(signals.get("max_price_usd", 0) or 0), 4),
+                "search_provider": search_providers.get(sq_query, "—"),
+                "free_results": free_out,
+                "best_coverage": round(float(best_cov), 3),
+                "quality_threshold": round(qth, 3),
+                "coverage_status": "gap" if is_gap else "ok",
+                "coverage_gap_detail": gap_detail,
+                "probe": {
+                    "free_count": int(pr.get("free_count", 0) or 0),
+                    "paid_count": int(pr.get("paid_count", 0) or 0),
+                    "new_at_paid": int(pr.get("new_at_paid", 0) or 0),
+                    "results": probe_out,
+                    "skipped_reason": pr.get("skipped_reason"),
+                    "attempted": pr.get("attempted"),
+                    "valyu_error": pr.get("valyu_error"),
+                    "valyu_only_free_tier": pr.get("valyu_only_free_tier"),
+                    "valyu_proprietary_cpm_used": pr.get("valyu_proprietary_cpm_used"),
+                },
+            }
+        )
+    return sub_query_runs
+
+
+def _synthesize_research_answer(
+    query: str,
+    digest: str,
+    rc: dict,
+    free_plan_n: int,
+    paid_plan_n: int,
+    total_bid: float,
+    client,
+) -> dict:
+    """
+    Writer-node style answer from the same digest the critic sees (deep_reasoning_researcher
+    flow: retrieve → critic → writer). Stub when no LLM.
+    """
+    stub = {
+        "mode": "stub",
+        "text": (
+            "This step corresponds to the **Writer** node in "
+            "[deep_reasoning_researcher](https://github.com/themiccc/deep_reasoning_researcher): "
+            "after search and the critic, the pipeline would synthesize a full answer from gathered evidence. "
+            "Configure an OpenAI API key for Instructor to generate that answer here from your snippets."
+        ),
+        "summary_line": "Writer step — configure LLM for synthesized answer.",
+    }
+    if client is None:
+        return stub
+    if not (digest or "").strip():
+        return {**stub, "text": stub["text"] + " (Empty digest — nothing to synthesize.)"}
+    try:
+        from pydantic import BaseModel, Field
+
+        class ResearchWriterOutput(BaseModel):
+            """Instructor requires response_model on patched OpenAI clients."""
+
+            answer: str = Field(
+                description=(
+                    "Several short paragraphs answering the user question using only the evidence; "
+                    "say when information is missing; no invented URLs, quotes, or numbers."
+                )
+            )
+
+        pct = rc.get("completeness_percent")
+        need = rc.get("need_more_information")
+        prompt = (
+            f"User question:\n{query.strip()}\n\n"
+            f"Evidence (web search titles/snippets only):\n{digest[:12000]}\n\n"
+            f"Completeness context: ~{pct}% · need_more_information={need} · "
+            f"free hits in plan: {free_plan_n} · paid line items: {paid_plan_n} · total bid ${total_bid:.4f}\n\n"
+            "Write a clear answer (several short paragraphs). Ground claims in the evidence above; "
+            "if something is not in the snippets, say so. Do not invent URLs, quotes, or numbers not implied by the text."
+        )
+        out = client.chat.completions.create(
+            model="gpt-4o-mini",
+            response_model=ResearchWriterOutput,
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are the Writer in a research pipeline. Answer only from the user's evidence block.",
+                },
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0.25,
+            timeout=45,
+        )
+        text = (out.answer or "").strip()
+        return {
+            "mode": "llm",
+            "text": text,
+            "summary_line": "Writer: answer drafted from search digest.",
+        }
+    except Exception as ex:
+        logger.warning("synthesis failed: %s", ex)
+        return {
+            "mode": "error",
+            "text": f"Synthesis failed: {(str(ex) or type(ex).__name__)[:280]}",
+            "summary_line": "Writer step failed.",
+        }
+
+
+def optimize(query, customer_id="default"):
+    deadline = time.time() + MAX_OPTIMIZE_SECONDS
+
+    # --- Round 1: plan ---
+    _n_queries = _query_complexity(query)
+    _decomp = _decompose_query(query, n=_n_queries)
+    sub_queries = _decomp.get("sub_queries") or []
+    query_fan_out_rationale = (_decomp.get("rationale") or "").strip()
+
+    # Accumulated state across all fanout rounds
+    sq_with_signals: list = []
+    free_results: dict = {}
+    probe_results: dict = {}
+    search_providers: dict = {}
+    all_candidates: list = []
+
+    # --- Round 1: fanout ---
+    r_sq, r_free, r_probe, r_prov, valyu_probes_used = _run_fanout_round(
+        sub_queries, deadline, 0
+    )
+    sq_with_signals.extend(r_sq)
+    free_results.update(r_free)
+    probe_results.update(r_probe)
+    search_providers.update(r_prov)
+
+    # --- Re-fanout loop: fire more searches when critic says need_more_information ---
+    _refanout_round = 1
+    while _refanout_round < MAX_REFANOUT_ROUNDS and time.time() < deadline:
+        _snapshot = _build_sub_query_runs(sq_with_signals, free_results, probe_results, search_providers)
+        _digest = _build_research_digest(_snapshot)
+        _mean_best = (
+            sum(r.get("best_coverage", 0) or 0 for r in _snapshot) / len(_snapshot)
+            if _snapshot else 0.0
+        )
+        _interim = evaluate_research_completeness(
+            query,
+            _digest,
+            _instructor_client(),
+            {
+                "n_subqueries": len(_snapshot),
+                "subqueries_met_floor": sum(1 for r in _snapshot if r.get("coverage_status") == "ok"),
+                "gap_count": sum(1 for r in _snapshot if r.get("coverage_status") == "gap"),
+                "mean_best_relevance": _mean_best,
+            },
+        )
+        if not _interim.get("need_more_information"):
+            break
+        if time.time() >= deadline:
+            break
+        already_tried = [sq["query"] for sq, _ in sq_with_signals]
+        _followup_n = max(2, _n_queries // 2)
+        _followup_decomp = _decompose_followup_queries(query, already_tried, n=_followup_n)
+        followup_sqs = _followup_decomp.get("sub_queries") or []
+        if not followup_sqs:
+            break
+        r_sq, r_free, r_probe, r_prov, valyu_probes_used = _run_fanout_round(
+            followup_sqs, deadline, valyu_probes_used
+        )
+        sq_with_signals.extend(r_sq)
+        free_results.update(r_free)
+        probe_results.update(r_probe)
+        search_providers.update(r_prov)
+        _refanout_round += 1
 
     free_plan, paid_plan, skipped = [], [], []
     purchased_urls = set()
@@ -1319,13 +1692,22 @@ def optimize(query, customer_id="default"):
     sigs["queryUnderstanding"] = qu
     sigs["intent"] = primary_intent
     sigs["qualityThreshold"] = round(avg_quality_threshold, 3)
-    sigs["sub_queries"] = [{"query": sq["query"], "goal": sq["goal"], "signals": sig} for sq, sig in sq_with_signals]
+    sigs["sub_queries"] = [
+        {
+            "query": sq["query"],
+            "goal": sq.get("goal", ""),
+            "research_objective": (sq.get("research_objective") or "").strip(),
+            "signals": sig,
+        }
+        for sq, sig in sq_with_signals
+    ]
     sigs["query_fan_out"] = {
         "rationale": query_fan_out_rationale,
-        "max_queries": 3,
+        "max_queries": _n_queries,
         "source": (_decomp.get("source") or "local"),
         "planner_framework": "deep_reasoning_researcher",
         "planner_framework_url": DEEP_RESEARCH_FRAMEWORK_URL,
+        "refanout_rounds": _refanout_round,
     }
     bid_ceiling = max([sig["max_price_usd"] for _sq, sig in sq_with_signals] or [0.0])
 
@@ -1334,78 +1716,7 @@ def optimize(query, customer_id="default"):
     n_subq_processed = len(sq_with_signals)
     n_subq_planned = len(sub_queries)
 
-    sub_query_runs = []
-    for idx, (sq, signals) in enumerate(sq_with_signals, start=1):
-        sq_query = sq["query"]
-        fr = free_results.get(sq_query, [])
-        best_cov = max((r.get("coverage_score", 0) for r in fr), default=0.0)
-        qth = float(signals.get("quality_threshold", 0) or 0)
-        is_gap = best_cov < qth
-        gap_detail = (
-            f"gap: best free relevance {best_cov:.3f} < quality floor {qth:.3f} "
-            f"(raise hit quality or use paid probe)"
-            if is_gap
-            else f"ok: best free relevance {best_cov:.3f} ≥ floor {qth:.3f}"
-        )
-        free_out = []
-        for r in fr:
-            free_out.append(
-                {
-                    "title": (r.get("title") or "")[:300],
-                    "url": r.get("url") or "",
-                    "snippet": ((r.get("snippet") or "").replace("\n", " "))[:400],
-                    "source": r.get("source") or "",
-                    "date": r.get("date"),
-                    "snippet_score": round(float(r.get("snippet_score", 0) or 0), 4),
-                    "rag_score": r.get("rag_score"),
-                    "rag_status": r.get("rag_status"),
-                    "coverage_score": round(float(r.get("coverage_score", 0) or 0), 4),
-                }
-            )
-        pr = probe_results.get(sq_query, {}) or {}
-        probe_list = pr.get("results") or []
-        probe_out = []
-        for r in probe_list:
-            if not isinstance(r, dict):
-                continue
-            probe_out.append(
-                {
-                    "title": (r.get("title") or "")[:300],
-                    "url": r.get("url") or "",
-                    "snippet": ((r.get("snippet") or "").replace("\n", " "))[:400],
-                    "source": r.get("source") or "",
-                    "date": r.get("date"),
-                    "inferred_price": float(r.get("inferred_price", 0) or 0),
-                    "unlocked_at": r.get("unlocked_at") or "",
-                }
-            )
-        sub_query_runs.append(
-            {
-                "index": idx,
-                "query": sq_query,
-                "goal": sq.get("goal", ""),
-                "intent": signals.get("intent"),
-                "domain": signals.get("domain"),
-                "max_price_usd": round(float(signals.get("max_price_usd", 0) or 0), 4),
-                "search_provider": search_providers.get(sq_query, "—"),
-                "free_results": free_out,
-                "best_coverage": round(float(best_cov), 3),
-                "quality_threshold": round(qth, 3),
-                "coverage_status": "gap" if is_gap else "ok",
-                "coverage_gap_detail": gap_detail,
-                "probe": {
-                    "free_count": int(pr.get("free_count", 0) or 0),
-                    "paid_count": int(pr.get("paid_count", 0) or 0),
-                    "new_at_paid": int(pr.get("new_at_paid", 0) or 0),
-                    "results": probe_out,
-                    "skipped_reason": pr.get("skipped_reason"),
-                    "attempted": pr.get("attempted"),
-                    "valyu_error": pr.get("valyu_error"),
-                    "valyu_only_free_tier": pr.get("valyu_only_free_tier"),
-                    "valyu_proprietary_cpm_used": pr.get("valyu_proprietary_cpm_used"),
-                },
-            }
-        )
+    sub_query_runs = _build_sub_query_runs(sq_with_signals, free_results, probe_results, search_providers)
 
     digest = _build_research_digest(sub_query_runs)
     mean_best = (
@@ -1425,6 +1736,16 @@ def optimize(query, customer_id="default"):
             "gap_count": sum(1 for r in sub_query_runs if r.get("coverage_status") == "gap"),
             "mean_best_relevance": mean_best,
         },
+    )
+
+    synthesis = _synthesize_research_answer(
+        query,
+        digest,
+        research_completeness,
+        len(free_plan),
+        len(paid_plan),
+        float(total_bid),
+        _instructor_client(),
     )
 
     # Visualizable pipeline log (timestamps are synthetic spacing for readability)
@@ -1468,6 +1789,7 @@ def optimize(query, customer_id="default"):
     _plog(
         f"critic ({rc_mode}): completeness {rc_pct}% · need_more={rc_need}"
     )
+    _plog(f"writer ({synthesis.get('mode', '?')}): {synthesis.get('summary_line', '—')}")
 
     n_runs = len(sub_query_runs)
     free_ok_n = sum(1 for r in sub_query_runs if r.get("coverage_status") == "ok")
@@ -1506,8 +1828,10 @@ def optimize(query, customer_id="default"):
                 {"id": "signals", "label": "signals", "status": "done"},
                 {"id": "search", "label": "search", "status": "done"},
                 {"id": "probe", "label": "probe", "status": "done"},
-                {"id": "synth", "label": "synth", "status": "done"},
+                {"id": "plan", "label": "plan", "status": "done"},
+                {"id": "writer", "label": "answer", "status": "done"},
             ],
+            "synthesis": synthesis,
             "pipeline_stats": {
                 "subqueries": n_runs,
                 "free_covers": free_ok_n,

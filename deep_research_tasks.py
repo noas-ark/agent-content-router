@@ -13,16 +13,48 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from pydantic import BaseModel, Field
+
 logger = logging.getLogger(__name__)
+
+
+class SearchTaskItem(BaseModel):
+    """One planner task: search string, facet label, and expanded research intent (DeepReason-style)."""
+
+    query: str = Field(description="Web search string for a single facet; suitable for a search engine.")
+    goal: str = Field(
+        description="One short line (max ~140 chars), unique per task: the facet label / angle this query covers."
+    )
+    research_objective: str = Field(
+        default="",
+        description=(
+            "Expanded research goal (2–6 sentences), like deep_reasoning_researcher’s planner: "
+            "what this search must establish, what evidence would satisfy it, and how it connects "
+            "to the user’s original question. Do not paste the search query verbatim; explain intent."
+        ),
+    )
+
+
+class SearchTaskPlan(BaseModel):
+    rationale: str = Field(description="Briefly why these search tasks cover the user's question.")
+    tasks: list[SearchTaskItem] = Field(description="Distinct tasks; each goal must be unique to its query.", min_length=1)
 
 FRAMEWORK_URL = "https://github.com/themiccc/deep_reasoning_researcher"
 
 # Mirrors nodes.planner_node intent: distinct, specific search strings for the web.
-_PLANNER_SYSTEM = """You are a research planner (DeepReason-style).
+_PLANNER_SYSTEM = """You are a research planner (DeepReason-style; see github.com/themiccc/deep_reasoning_researcher).
 Break the user's question into separate, specific web search queries that together could
 support a comprehensive answer. Each query must target one angle; avoid near-duplicates.
-Prefer fewer queries when one search is enough; use up to the allowed maximum when the
-question truly needs multiple facets. Output only structured fields per the schema."""
+
+For EVERY task you MUST provide:
+- `goal`: one short unique line — the facet label only.
+- `research_objective`: a fuller paragraph (2–6 sentences) that stands alone: what this search
+  should establish, what “good” sources would demonstrate, and how this facet supports answering
+  the user’s original question. This must NOT duplicate `goal` word-for-word — it is the expanded
+  research intent, not a second short label.
+
+Prefer fewer queries when one search is enough; use up to the allowed maximum when the question
+truly needs multiple facets. Output only structured fields per the schema."""
 
 
 def plan_search_tasks(query: str, n: int, client: Any) -> dict | None:
@@ -32,22 +64,12 @@ def plan_search_tasks(query: str, n: int, client: Any) -> dict | None:
     if client is None:
         return None
     try:
-        from pydantic import BaseModel, Field  # type: ignore
-
-        class SearchTaskPlan(BaseModel):
-            rationale: str = Field(
-                description="Briefly why these search tasks cover the user's question"
-            )
-            tasks: list[str] = Field(
-                description="Distinct web search strings, one facet each",
-                min_length=1,
-            )
-
         user_msg = (
             f"User question:\n{query.strip()}\n\n"
             f"Maximum number of search tasks: {n}\n"
             "Return at least 1 task and at most the maximum. "
-            "Each task must be a standalone string suitable for a search engine."
+            "Each task needs `query`, `goal` (short facet label), and `research_objective` "
+            "(expanded paragraph: intent, success criteria, link to the user question)."
         )
         plan = client.chat.completions.create(
             model="gpt-4o-mini",
@@ -60,19 +82,28 @@ def plan_search_tasks(query: str, n: int, client: Any) -> dict | None:
             timeout=14,
         )
         rationale_text = (plan.rationale or "").strip()
-        tasks = [str(x).strip() for x in (plan.tasks or []) if str(x).strip()]
-        tasks = tasks[:n]
+        raw_tasks = list(plan.tasks or [])[:n]
         seen: set[str] = set()
-        deduped: list[str] = []
-        for x in tasks:
-            k = x.casefold()
-            if k not in seen:
-                seen.add(k)
-                deduped.append(x)
-        if not deduped:
+        out_sq: list[dict] = []
+        for t in raw_tasks:
+            q = (t.query or "").strip()
+            if not q:
+                continue
+            k = q.casefold()
+            if k in seen:
+                continue
+            seen.add(k)
+            g = (t.goal or "").strip() or f"Search angle: {q[:120]}"
+            ro = (t.research_objective or "").strip()
+            if not ro:
+                ro = (
+                    f"Establish material that supports the user’s question via this facet ({g}). "
+                    f"Use web results to gather verifiable facts and context; prefer authoritative "
+                    f"industry, regulatory, or trade sources where relevant."
+                )
+            out_sq.append({"query": q, "goal": g[:400], "research_objective": ro[:2000]})
+        if not out_sq:
             return None
-        goal_base = rationale_text or "Cover the user question with targeted searches."
-        out_sq = [{"query": qstr, "goal": goal_base} for qstr in deduped]
         return {
             "sub_queries": out_sq,
             "rationale": rationale_text or "Search tasks generated by the planner.",
@@ -83,11 +114,89 @@ def plan_search_tasks(query: str, n: int, client: Any) -> dict | None:
         return None
 
 
+_FOLLOWUP_PLANNER_SYSTEM = """You are a research planner (DeepReason-style).
+The user's question was already researched with an initial set of queries, but the
+critic found gaps. Generate NEW search queries that cover missing aspects. Do NOT repeat
+or rephrase queries already tried (listed in the user message).
+
+For each task provide `query`, `goal` (short facet label), and `research_objective` (2–6 sentences:
+what this follow-up must establish and how it fills the gap for the original question).
+Output only structured fields per the schema."""
+
+
+def plan_followup_tasks(
+    original_query: str,
+    already_tried: list[str],
+    n: int,
+    client: Any,
+) -> dict | None:
+    """
+    Like plan_search_tasks but instructs the planner to avoid already-tried queries.
+    Returns { sub_queries: [{query, goal}], rationale: str, source: str } or None on failure.
+    """
+    if client is None:
+        return None
+    try:
+        tried_block = "\n".join(f"  - {q}" for q in already_tried)
+        user_msg = (
+            f"Original question:\n{original_query.strip()}\n\n"
+            f"Queries already tried (do NOT repeat or rephrase these):\n{tried_block}\n\n"
+            f"Maximum number of NEW search tasks: {n}\n"
+            "Return at least 1 new task and at most the maximum. "
+            "Each task needs `query`, `goal`, and `research_objective`. "
+            "Queries must target aspects NOT covered by the already-tried list."
+        )
+        plan = client.chat.completions.create(
+            model="gpt-4o-mini",
+            response_model=SearchTaskPlan,
+            messages=[
+                {"role": "system", "content": _FOLLOWUP_PLANNER_SYSTEM},
+                {"role": "user", "content": user_msg},
+            ],
+            temperature=0.35,
+            timeout=14,
+        )
+        rationale_text = (plan.rationale or "").strip()
+        raw_tasks = list(plan.tasks or [])[:n]
+        tried_lower = {q.casefold() for q in already_tried}
+        seen: set[str] = set()
+        out_sq: list[dict] = []
+        for t in raw_tasks:
+            q = (t.query or "").strip()
+            if not q:
+                continue
+            k = q.casefold()
+            if k in seen or k in tried_lower:
+                continue
+            seen.add(k)
+            g = (t.goal or "").strip() or f"Follow-up angle: {q[:120]}"
+            ro = (t.research_objective or "").strip()
+            if not ro:
+                ro = (
+                    f"This follow-up targets a gap the first pass missed ({g}). "
+                    f"Collect evidence that, together with prior results, better answers the original question."
+                )
+            out_sq.append({"query": q, "goal": g[:400], "research_objective": ro[:2000]})
+        if not out_sq:
+            return None
+        return {
+            "sub_queries": out_sq,
+            "rationale": rationale_text or "Follow-up search tasks generated by the planner.",
+            "source": "deep_reasoning_researcher_followup_planner",
+        }
+    except Exception as e:
+        logger.debug("plan_followup_tasks failed: %s", e)
+        return None
+
+
 _CRITIC_SYSTEM = """You are a research quality critic (DeepReason-style).
 You only judge whether the *gathered* titles/snippets are enough to answer the user's
 question well—not whether the answer was written. Score completeness from 0 (nothing
-usable) to 1 (material is enough to answer fully). Set need_more_information true if
-important aspects are still missing."""
+usable) to 1 (material is enough to answer fully).
+
+Set need_more_information=true only when important aspects of the original question are
+still uncovered by these snippets. If completeness_0_1 is 0.75 or higher, default to
+need_more_information=false unless you can name a specific missing facet that search could fix."""
 
 
 def evaluate_research_completeness(
@@ -165,7 +274,8 @@ Research gathered so far (web search titles and snippets only):
 {research_digest[:14000]}
 
 Rate how sufficient this material is for answering the original question comprehensively.
-Use need_more_information=true if critical gaps remain."""
+Be consistent: high completeness (e.g. ≥0.75) should usually pair with need_more_information=false
+unless a concrete angle is still missing from the digest."""
 
         out = client.chat.completions.create(
             model="gpt-4o-mini",
@@ -174,11 +284,16 @@ Use need_more_information=true if critical gaps remain."""
                 {"role": "system", "content": _CRITIC_SYSTEM},
                 {"role": "user", "content": user_msg},
             ],
-            temperature=0.2,
+            temperature=0.1,
             timeout=16,
         )
         s01 = float(out.completeness_0_1)
         s01 = min(1.0, max(0.0, s01))
+        # Align flag with structural coverage: if every sub-query met the free-tier floor,
+        # extra fan-out would not address a "gap" — avoid showing "Yes" alongside high %.
+        need = bool(out.need_more_information)
+        if h_gaps == 0 and s01 >= 0.78:
+            need = False
         tips = {
             "completeness_percent": (
                 "The critic model’s 0–100% judgment of whether the titles and snippets you "
@@ -199,18 +314,18 @@ Use need_more_information=true if critical gaps remain."""
                 "still required for a complete answer."
             ),
             "need_more_how": (
-                "The same critic model sets a true/false flag from the digest. "
-                "It is instructed to say yes when important aspects of the original question "
-                "are not yet covered by the snippets. This mirrors the upstream project’s "
-                "decision to loop for more search vs. proceed—here we only expose the decision, "
-                "not the extra loop."
+                "The critic sets yes/no from the digest. After the call, we force “no” when "
+                "every sub-query already met its free-tier quality floor (no coverage gaps) "
+                "and completeness is ≥78%, so you do not see “more info needed” with nowhere "
+                "structural left to search. Re-fan-out (extra sub-queries) runs at most once "
+                "per Optimize when the interim critic said yes—see MAX_REFANOUT_ROUNDS."
             ),
         }
         return {
             "mode": "llm",
             "completeness_score_0_1": round(s01, 3),
             "completeness_percent": round(100.0 * s01, 1),
-            "need_more_information": bool(out.need_more_information),
+            "need_more_information": need,
             "critic_summary": (out.summary or "").strip() or "—",
             "tips": tips,
             "framework_ref": FRAMEWORK_URL,

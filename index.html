@@ -54,6 +54,7 @@
   /* Decomposed sub-queries (query fanout) */
   .fanout-block{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:12px 14px;margin-bottom:16px}
   .fanout-block .fanout-title{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-muted);margin-bottom:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .fanout-title-tip{cursor:help;border-bottom:1px dotted rgba(139,148,158,.55)}
   .fanout-block .fanout-badge{font-size:9px;font-weight:600;letter-spacing:.06em;padding:2px 8px;border-radius:10px;background:var(--surface3);border:1px solid var(--border2);color:var(--text-dim)}
   .fanout-item{border:1px solid var(--border);border-radius:5px;padding:10px 12px;margin-bottom:8px;background:var(--bg)}
   .fanout-item:last-child{margin-bottom:0}
@@ -61,11 +62,30 @@
   .fanout-idx{flex-shrink:0;width:22px;height:22px;border-radius:50%;background:var(--surface3);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--accent)}
   .fanout-q{font-size:12px;font-weight:600;color:var(--text);line-height:1.4;margin:0;word-break:break-word}
   .fanout-goal{font-size:11px;color:var(--text-dim);line-height:1.45;margin-top:6px}
+  .fanout-goal-lbl{color:var(--text-muted);font-size:10px;text-transform:uppercase;letter-spacing:.06em}
+  .fanout-goal-full{cursor:help;border-bottom:1px dotted rgba(139,148,158,.4)}
+  .fanout-goal-details{margin-top:8px;border:1px solid var(--border2);border-radius:6px;background:var(--surface2);overflow:hidden}
+  .fanout-goal-details > summary{cursor:pointer;list-style:none;padding:7px 10px;font-size:11px;color:var(--text-dim);line-height:1.45;user-select:none}
+  .fanout-goal-details > summary::-webkit-details-marker{display:none}
+  .fanout-goal-details > summary::before{content:'▸';display:inline-block;margin-right:6px;font-size:9px;color:var(--text-muted);transition:transform .12s}
+  .fanout-goal-details[open] > summary::before{transform:rotate(90deg)}
+  .fanout-goal-details .fanout-goal-sum{font-weight:500;color:var(--text)}
+  .fanout-goal-detail{padding:0 10px 10px 28px;font-size:11px;line-height:1.55;color:var(--text-dim);border-top:1px solid var(--border2);margin-top:0;padding-top:8px}
+  .signals-simple-qb{margin-top:12px;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;font-size:11px}
+  .signals-simple-qb .ss-row{display:flex;gap:10px;padding:4px 0;border-bottom:1px solid var(--border2)}
+  .signals-simple-qb .ss-row:last-child{border-bottom:none}
+  .signals-simple-qb .ss-k{flex:0 0 120px;color:var(--text-muted);font-size:9px;text-transform:uppercase;letter-spacing:.06em}
+  .signals-simple-qb .ss-v{flex:1;color:var(--text-dim);word-break:break-word}
+  .signals-panel-simple .dr-critic-block{margin-top:16px}
   .fanout-meta{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
   .fanout-chip{font-size:9px;padding:3px 7px;background:var(--surface3);border:1px solid var(--border2);border-radius:3px;color:var(--text-dim)}
   .fanout-subhdr{font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);margin:12px 0 6px}
   .fanout-res-row{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;border-top:1px solid var(--border);padding:10px 0}
   .fanout-res-row:first-of-type{border-top:none;padding-top:2px}
+  .fanout-res-row-paywall{border-left:3px solid rgba(210,153,34,.55);padding-left:10px;margin-left:-2px;border-radius:2px 0 0 2px;background:rgba(210,153,34,.04)}
+  .fanout-res-row-snippet-only{opacity:.92}
+  .fanout-res-paywall-badge{font-size:8px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:3px 7px;border-radius:3px;background:rgba(210,153,34,.14);color:#d29922;border:1px solid rgba(210,153,34,.4);flex-shrink:0;line-height:1.2}
+  .fanout-res-paywall-note{font-size:9px;color:var(--text-muted);margin-top:5px;line-height:1.35}
   .fanout-res-main{flex:1;min-width:0}
   .rag-rel-box{
     flex-shrink:0;width:108px;text-align:right;padding:9px 11px;border-radius:8px;
@@ -87,9 +107,6 @@
   .fanout-nores{font-size:10px;color:var(--text-muted);padding:4px 0 8px}
   .fanout-status-gap{color:var(--yellow)!important;border-color:rgba(210,153,34,.35)!important;background:rgba(210,153,34,.08)!important}
   .fanout-status-ok{color:var(--green)!important;border-color:rgba(63,185,80,.35)!important;background:rgba(63,185,80,.08)!important}
-  .fanout-rationale{font-size:11px;color:var(--text-dim);line-height:1.5;margin-bottom:12px;padding:10px 12px;background:var(--bg);border:1px solid var(--border);border-radius:5px;border-left:3px solid var(--accent)}
-  .fanout-rationale .fanout-rationale-hd{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px}
-  .fanout-src{font-size:9px;color:var(--text-muted);margin-top:4px}
 
   /* LAYOUT — two columns: fixed query rail + detail fills remaining width (no empty 3rd column) */
   .main{flex:1;display:flex;overflow:hidden;position:relative;width:100%;min-width:0}
@@ -311,26 +328,33 @@
   .pipe-progress-track{height:6px;background:var(--surface3);border-radius:4px;overflow:hidden;border:1px solid var(--border)}
   .pipe-progress-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--green-dim),var(--accent));border-radius:3px;transition:width .12s linear}
   .fanout-search-details{margin-bottom:10px;border:1px solid var(--border);border-radius:6px;background:var(--bg)}
-  .fanout-search-details > summary.fanout-search-sum{cursor:pointer;list-style:none;padding:8px 12px;font-size:10px;color:var(--text-dim);letter-spacing:.06em;display:flex;align-items:center;gap:8px;user-select:none}
+  .fanout-search-details > summary.fanout-search-sum{cursor:pointer;list-style:none;padding:8px 12px;font-size:10px;color:var(--text-dim);letter-spacing:.06em;display:flex;align-items:center;gap:8px;flex-wrap:wrap;user-select:none}
   .fanout-search-details > summary.fanout-search-sum::-webkit-details-marker{display:none}
   .fanout-search-details > summary.fanout-search-sum::before{content:'▼';font-size:8px;color:var(--accent);transition:transform .15s}
   .fanout-search-details:not([open]) > summary.fanout-search-sum::before{transform:rotate(-90deg)}
-  .fanout-search-details.fanout-search-sel{border-color:rgba(57,211,83,.5);box-shadow:0 0 0 2px rgba(57,211,83,.1)}
+  .fanout-search-details.fanout-search-gap{border-color:rgba(210,153,34,.45);background:rgba(210,153,34,.04)}
   .fanout-search-body{padding:0 12px 12px}
+  .search-coverage-legend{font-size:10px;line-height:1.5;color:var(--text-dim);padding:8px 10px;margin-bottom:12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px}
+  .search-coverage-legend-allok{border-left:3px solid rgba(63,185,80,.55)}
+  .search-coverage-legend-gap{border-left:3px solid rgba(210,153,34,.65)}
+  .search-cov-pill{font-size:8px;font-weight:700;letter-spacing:.06em;padding:2px 7px;border-radius:999px;flex-shrink:0;font:inherit}
+  button.search-cov-pill{cursor:pointer}
+  .search-cov-ok{color:var(--green);background:rgba(63,185,80,.12);border:1px solid rgba(63,185,80,.35)}
+  .search-cov-gap{color:#d29922;background:rgba(210,153,34,.12);border:1px solid rgba(210,153,34,.4)}
+  .search-cov-meta{font-size:9px;color:var(--text-muted);white-space:nowrap}
+  .search-pricefetch-jump{font-family:inherit;font-size:9px;font-weight:600;padding:4px 10px;border-radius:4px;border:1px solid rgba(210,153,34,.45);background:rgba(210,153,34,.12);color:#d29922;cursor:pointer;flex-shrink:0}
+  .search-pricefetch-jump:hover{background:rgba(210,153,34,.22)}
+  .search-sq-query-link{cursor:pointer;border-bottom:1px dotted rgba(210,153,34,.55);color:var(--text)}
+  .search-sq-query-link:hover{color:var(--accent)}
+  .fanout-item.pricefetch-flash{animation:pricefetchFlash 1.4s ease-out 1}
+  @keyframes pricefetchFlash{0%{box-shadow:0 0 0 2px rgba(210,153,34,.55)}40%{box-shadow:0 0 0 3px rgba(210,153,34,.25)}100%{box-shadow:none}}
   .fanout-gap-line{font-size:9px;color:var(--text-muted);line-height:1.45;margin:6px 0 10px;padding:6px 8px;background:var(--surface2);border-radius:4px;border-left:3px solid var(--yellow)}
-  .fanout-dr{font-size:9px;color:var(--text-dim);line-height:1.45;margin-bottom:8px;padding:8px 10px;background:rgba(56,139,253,.06);border-radius:5px;border:1px solid rgba(56,139,253,.2)}
-  .fanout-dr a{color:var(--accent)}
-  .fanout-dejan{font-size:9px;color:var(--text-muted);margin-top:8px;line-height:1.5}
-  .fanout-dejan a{color:var(--accent)}
   .dr-critic-block{margin-bottom:16px;padding:12px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:8px}
   .dr-critic-row{display:flex;gap:16px;flex-wrap:wrap;margin-top:8px}
   .dr-critic-metric{cursor:help;min-width:120px;padding:8px 10px;background:var(--bg);border:1px solid var(--border2);border-radius:6px}
   .dr-critic-metric:hover{border-color:rgba(57,211,83,.35)}
   .dr-critic-lbl{display:block;font-size:9px;color:var(--text-muted);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px}
   .dr-critic-val{font-size:18px;font-weight:600;color:var(--accent);font-variant-numeric:tabular-nums}
-  .dr-critic-sum{font-size:10px;color:var(--text-dim);line-height:1.5;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)}
-  .dr-critic-foot{font-size:9px;color:var(--text-muted);margin-top:10px;line-height:1.45}
-  .fanout-item-sel{outline:1px solid rgba(57,211,83,.45);box-shadow:0 0 0 2px rgba(57,211,83,.08);border-radius:5px}
   .rp-pipeline-block{margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border)}
   .rp-hdr{font-size:9px;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px}
   .rp-log{max-height:200px;overflow-y:auto;font-size:10px;line-height:1.5;color:var(--text-dim);padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:5px;margin-bottom:10px}
@@ -344,14 +368,39 @@
   .rp-syn-sum{margin-top:8px;padding-top:8px;border-top:1px solid var(--border);font-size:10px;color:var(--text-dim)}
   .rp-syn-sum b{color:var(--accent)}
 
-  /* Merged detail column — main tabs */
-  .main-tabbar{display:flex;flex-wrap:wrap;gap:0;align-items:center;border-bottom:1px solid var(--border);background:var(--surface2);padding:0 8px 0 12px;flex-shrink:0}
-  .main-tab{position:relative;padding:11px 14px 10px;font-size:11px;font-weight:500;color:var(--text-muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:color .15s,border-color .15s;font-family:'IBM Plex Mono',monospace;letter-spacing:.02em}
-  .main-tab:hover{color:var(--text-dim)}
-  .main-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
-  .main-tab .tab-dot{position:absolute;top:5px;right:2px;width:5px;height:5px;border-radius:50%;background:var(--accent);opacity:0;box-shadow:0 0 6px var(--accent)}
-  .main-tab.active .tab-dot{opacity:1}
+  /* Pipeline: query → fan-out → search → price fetch → plan → answer */
+  .pipeline-nav{display:flex;align-items:center;gap:8px;padding:10px 12px 12px;background:var(--surface2);border-bottom:1px solid var(--border);flex-shrink:0}
+  .pipeline-nav-steps{display:flex;align-items:center;flex-wrap:wrap;gap:2px 6px;flex:1;min-width:0}
+  .pipeline-log-btn{margin-left:auto;flex-shrink:0;font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:600;letter-spacing:.04em;padding:6px 10px;border-radius:6px;border:1px solid var(--border2);background:var(--bg);color:var(--text-dim);cursor:pointer}
+  .pipeline-log-btn:hover{color:var(--accent);border-color:rgba(56,139,253,.45)}
+  .pld{position:fixed;inset:0;z-index:2000;pointer-events:none;visibility:hidden;opacity:0;transition:opacity .2s}
+  .pld.on{pointer-events:auto;visibility:visible;opacity:1}
+  .pld-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.45)}
+  .pld-panel{position:absolute;top:0;right:0;bottom:0;width:min(420px,92vw);background:var(--surface);border-left:1px solid var(--border);box-shadow:-8px 0 32px rgba(0,0,0,.35);display:flex;flex-direction:column}
+  .pld-head{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--border);font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted)}
+  .pld-close{background:none;border:none;color:var(--text-dim);font-size:18px;cursor:pointer;line-height:1;padding:4px}
+  .pld-close:hover{color:var(--text)}
+  .pld-body{flex:1;overflow-y:auto;padding:10px 12px;font-size:10px;font-family:'IBM Plex Mono',monospace;line-height:1.55;color:var(--text-dim)}
+  .pld-line{margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid var(--border2)}
+  .pld-line:last-child{border-bottom:none}
+  .pld-t{color:var(--text-muted);margin-right:6px;font-variant-numeric:tabular-nums}
+  .hit-tier-badge{font-size:8px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:3px 7px;border-radius:3px;flex-shrink:0;line-height:1.2}
+  .hit-tier-full{background:rgba(63,185,80,.14);color:var(--green);border:1px solid rgba(63,185,80,.4)}
+  .hit-tier-snippet{background:var(--surface3);color:var(--text-muted);border:1px solid var(--border2)}
+  .fanout-res-rag-full{border-left:3px solid rgba(63,185,80,.55);padding-left:10px;margin-left:-2px}
+  .hit-cov-badge{font-size:9px;font-weight:600;padding:4px 8px;border-radius:4px;margin-bottom:6px;display:inline-block}
+  .hit-cov-ok{background:rgba(63,185,80,.12);color:var(--green);border:1px solid rgba(63,185,80,.35)}
+  .hit-cov-gap{background:rgba(210,153,34,.1);color:#d29922;border:1px solid rgba(210,153,34,.4)}
+  .plan-summary-box{font-size:11px;line-height:1.55;color:var(--text-dim);padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;margin-bottom:10px}
+  .answer-panel-body{font-size:12px;line-height:1.65;color:var(--text-dim);white-space:pre-wrap}
+  .pipe-step{position:relative;font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:500;letter-spacing:.02em;padding:7px 12px;border-radius:999px;border:1px solid var(--border2);background:var(--bg);color:var(--text-muted);cursor:pointer;transition:color .15s,border-color .15s,background .15s,box-shadow .15s}
+  .pipe-step:hover{color:var(--text-dim)}
+  .pipe-step.active{color:var(--accent);border-color:rgba(56,139,253,.55);background:rgba(56,139,253,.1);box-shadow:0 0 0 1px rgba(56,139,253,.15)}
+  .pipe-step .tab-dot{position:absolute;top:3px;right:5px;width:4px;height:4px;border-radius:50%;background:var(--accent);opacity:0}
+  .pipe-step.active .tab-dot{opacity:.85}
+  .pipe-connector{width:10px;height:2px;background:linear-gradient(90deg,var(--border2),var(--border));border-radius:1px;flex-shrink:0;opacity:.85}
   .main-tab-panel{display:block;min-height:120px}
+  .fanout-badge-warn{color:#d29922!important;border-color:rgba(210,153,34,.45)!important;background:rgba(210,153,34,.12)!important;font-weight:600}
 </style>
 </head>
 <body>
@@ -363,7 +412,6 @@
   <div class="logo"><div class="logo-icon"><img src="/static/bootk-logo.svg" alt=""></div><span class="logo-text">bootk.ai</span></div>
   <div class="sep"></div>
   <span style="font-size:10px;color:var(--text-dim);letter-spacing:.06em">Premium content purchasing for agents</span>
-  <span class="badge">v0.4</span>
   <div class="ml-auto" style="display:flex;align-items:center;gap:14px">
     <a href="/admin" class="admin-link">Admin</a>
     <a href="/api-reference" class="badge api-ref-pill">API Reference</a>
@@ -397,19 +445,35 @@
   </div>
 </div>
 <div class="resize-handle" id="resize1" data-left="panelLeft" data-right="panelDetail" title="Drag to resize"></div>
-<!-- DETAIL: tabs = sub-queries · signals · search · probe · plan -->
+<!-- DETAIL: pipeline = signals → fan-out → search → price fetch → plan → answer -->
 <div class="panel panel-detail" id="panelDetail">
-  <div class="main-tabbar" id="mainTabbar">
-    <div class="main-tab active" data-main-tab="subqueries" onclick="switchMainTab('subqueries')">sub-queries<span class="tab-dot"></span></div>
-    <div class="main-tab" data-main-tab="signals" onclick="switchMainTab('signals')">signals<span class="tab-dot"></span></div>
-    <div class="main-tab" data-main-tab="search" onclick="switchMainTab('search')">search<span class="tab-dot"></span></div>
-    <div class="main-tab" data-main-tab="probe" onclick="switchMainTab('probe')">probe<span class="tab-dot"></span></div>
-    <div class="main-tab" data-main-tab="plan" onclick="switchMainTab('plan')">plan<span class="tab-dot"></span></div>
+  <div class="pipeline-nav" id="pipelineNav">
+    <div class="pipeline-nav-steps" role="tablist" aria-label="Optimize pipeline">
+      <button type="button" class="pipe-step active" role="tab" data-main-tab="signals" onclick="switchMainTab('signals')">signals<span class="tab-dot"></span></button>
+      <span class="pipe-connector" aria-hidden="true"></span>
+      <button type="button" class="pipe-step" role="tab" data-main-tab="subqueries" onclick="switchMainTab('subqueries')">fan-out<span class="tab-dot"></span></button>
+      <span class="pipe-connector" aria-hidden="true"></span>
+      <button type="button" class="pipe-step" role="tab" data-main-tab="search" onclick="switchMainTab('search')">search<span class="tab-dot"></span></button>
+      <span class="pipe-connector" aria-hidden="true"></span>
+      <button type="button" class="pipe-step" role="tab" data-main-tab="probe" onclick="switchMainTab('probe')">price fetch<span class="tab-dot"></span></button>
+      <span class="pipe-connector" aria-hidden="true"></span>
+      <button type="button" class="pipe-step" role="tab" data-main-tab="plan" onclick="switchMainTab('plan')">plan &amp; buy<span class="tab-dot"></span></button>
+      <span class="pipe-connector" aria-hidden="true"></span>
+      <button type="button" class="pipe-step" role="tab" data-main-tab="answer" onclick="switchMainTab('answer')">answer<span class="tab-dot"></span></button>
+    </div>
+    <button type="button" class="pipeline-log-btn" id="pipelineLogBtn" onclick="togglePipelineLogDrawer()" title="Open pipeline log">Pipeline log</button>
+  </div>
+  <div id="pipelineLogDrawer" class="pld" aria-hidden="true">
+    <div class="pld-backdrop" onclick="closePipelineLogDrawer()"></div>
+    <aside class="pld-panel" role="dialog" aria-labelledby="pldTitle">
+      <div class="pld-head"><span id="pldTitle">Pipeline log</span><button type="button" class="pld-close" onclick="closePipelineLogDrawer()" aria-label="Close">×</button></div>
+      <div class="pld-body" id="pipelineLogBody"><div style="opacity:.6">Run Optimize or switch tabs to append entries.</div></div>
+    </aside>
   </div>
   <div class="pb" id="detailP">
     <div class="empty">
       <div class="empty-icon">⬡</div>
-      <div>Run Optimize to see<br>fan-out, signals, search, probe<br><br><span style="font-size:9px;opacity:.6">use tabs above · plan = costs &amp; bids</span></div>
+      <div>Run Optimize to see<br>signals → fan-out → search → price fetch → plan → answer<br><br><span style="font-size:9px;opacity:.6">Pipeline log (top right) · answer = synthesized from snippets when LLM is configured</span></div>
     </div>
   </div>
 </div>
@@ -447,6 +511,92 @@ function registerTip(html) {
   const id = 'tip_' + (tipIdCounter++);
   TIP_REGISTRY[id] = html;
   return id;
+}
+
+/** Hover copy for Query fanout heading + meta chips (registered once). */
+let _fanoutPillTips = null;
+function getFanoutPillTips() {
+  if (_fanoutPillTips) return _fanoutPillTips;
+  _fanoutPillTips = {
+    queryFanoutHeading: registerTip(
+      '<b>Query fanout</b><div class="t-calc"><b>What it is</b> — Your question is split into <b>several distinct web search strings</b> (one facet per sub-query) so each retrieval pass stays focused.<br><br><b>How sub-queries are produced</b> — With an OpenAI API key, the server runs <code>plan_search_tasks</code>: <b>gpt-4o-mini</b> (Instructor, structured output) returns a deduped list capped at the configured maximum — same <i>planner</i> idea as <code>deep_reasoning_researcher</code>. Without a key or if that call fails, <code>_decompose_query_local</code> uses lightweight rules (short query → one search; long text → token-window splits).</div>'
+    ),
+    floor: registerTip(
+      '<b>Quality floor</b><div class="t-calc">Minimum relevance this sub-query needs from a <b>free</b> hit, from routing signals (<code>quality_threshold</code>). Compare with results in the <b>search</b> step.</div>'
+    ),
+    intent: registerTip(
+      '<b>Intent</b><div class="t-calc">Coarse <b>task label</b> for routing (e.g. breaking news vs factual lookup), from <code>_infer_signals</code>: structured LLM output when an API key exists, else local keyword rules.</div>'
+    ),
+    domain: registerTip(
+      '<b>Domain</b><div class="t-calc">Broad <b>topic bucket</b> (scientific, financial, legal, …) used with intent for source fit and bid ceilings.</div>'
+    ),
+    content: registerTip(
+      '<b>Content type</b><div class="t-calc">Expected <b>source shape</b> — e.g. <code>news_article</code>, <code>academic_paper</code>, <code>regulatory_doc</code> — from the same routing signals.</div>'
+    ),
+    ceiling: registerTip(
+      '<b>Ceiling</b><div class="t-calc">Maximum <b>bid per article</b> (USD) this sub-query is allowed to spend, derived from intent, domain, and quality needs — the purchase-plan cap.</div>'
+    ),
+  };
+  return _fanoutPillTips;
+}
+
+/** Goal line per sub-query — expand to read the full goal (threshold ~1–2 sentences). */
+function fmtGoalBlock(raw) {
+  const g = (raw || '').trim();
+  if (!g) return '';
+  const esc = escapeHtml(g);
+  const useDetails = g.length > 48 || g.includes('\n');
+  if (!useDetails) {
+    return `<div class="fanout-goal"><span class="fanout-goal-lbl">Goal · </span>${esc}</div>`;
+  }
+  const sumSlice = g.slice(0, 80);
+  const sumMore = g.length > 80 || g.includes('\n');
+  const sumHtml = escapeHtml(sumSlice) + (sumMore ? '…' : '');
+  const bodyHtml = esc.replace(/\n/g, '<br>');
+  return (
+    `<details class="fanout-goal-details">` +
+    `<summary><span class="fanout-goal-lbl">Goal</span> <span class="fanout-goal-sum">${sumHtml}</span></summary>` +
+    `<div class="fanout-goal-detail">${bodyHtml}</div>` +
+    `</details>`
+  );
+}
+
+/** Short `goal` + expanded `research_objective` (DeepReason-style); falls back to fmtGoalBlock(goal) if no expansion. */
+function fmtGoalBlockPair(goal, researchObjective) {
+  const g = (goal || '').trim();
+  const ro = (researchObjective || '').trim();
+  if (!g && !ro) return '';
+  if (!ro || ro === g) {
+    return g ? fmtGoalBlock(g) : fmtGoalBlock(ro);
+  }
+  const escG = escapeHtml(g);
+  const escRo = escapeHtml(ro).replace(/\n/g, '<br>');
+  return (
+    `<details class="fanout-goal-details">` +
+    `<summary><span class="fanout-goal-lbl">Goal</span> <span class="fanout-goal-sum">${escG}</span></summary>` +
+    `<div class="fanout-goal-detail"><span class="fanout-goal-lbl" style="display:block;margin-bottom:6px;opacity:.9">Research objective</span>${escRo}</div>` +
+    `</details>`
+  );
+}
+
+function coverageIsIncomplete(covStr) {
+  const m = String(covStr || '').trim().match(/^(\d+)\s*\/\s*(\d+)$/);
+  if (!m) return false;
+  return m[1] !== m[2];
+}
+
+function coverageBadgeTipRegister(covStr) {
+  const covInc = coverageIsIncomplete(covStr);
+  const id = registerTip(
+    '<b>Coverage ' +
+      escapeHtml(covStr) +
+      '</b><div class="t-calc">' +
+      (covInc
+        ? '<b>Incomplete</b> — Numerator &lt; denominator: at least one sub-query still needed paid-tier value or did not meet the free quality floor, so <b>a purchase or bid</b> may be part of the optimized plan.<br><br>'
+        : '<b>Full coverage</b> — Every sub-query met the bar with free hits (or equivalent).<br><br>') +
+      'Counts sub-queries where the best free hit met that sub-query’s quality floor (or a paid hit was used) vs. all sub-queries run. Valyu price fetches run on gap sub-queries, up to <code>MAX_VALYU_PROBES_PER_REQUEST</code> per Optimize.</div>'
+  );
+  return { tipId: id, warn: covInc };
 }
 
 function showTip(el) {
@@ -613,6 +763,27 @@ function buildSigObjects(sigs) {
   };
 }
 
+/** True when HTML was fetched and chunk embeddings contributed (RAG path succeeded). */
+function isFullRagHit(r) {
+  return r && r.rag_status === 'ok' && r.rag_score != null;
+}
+
+/** One-line label under Relevance % — must match when we use title+snippet vs full RAG (see rag_coverage.py). */
+function ragRelevanceSubLabel(r) {
+  const st = r.rag_status;
+  const rs = r.rag_score;
+  if (rs != null && st === 'ok') return 'RAG max + snippet';
+  if (st === 'skip_paywall') return 'Paywalled · snippet only';
+  if (!st) return 'Snippet only';
+  if (String(st).startsWith('fetch_failed')) return 'Fetch failed · snippet only';
+  if (st === 'fetch_short') return 'Page too short · snippet only';
+  if (st === 'no_chunks') return 'No body chunks · snippet only';
+  if (st === 'embed_failed') return 'Embed failed · snippet only';
+  if (st === 'not_fetched' || st === 'pending') return 'RAG incomplete · snippet only';
+  if (st === 'no_url') return 'No URL · snippet only';
+  return 'Snippet only';
+}
+
 function buildRagRelevanceTipHtml(r, subQuery) {
   const rs = r.rag_score;
   const st = r.rag_status || '';
@@ -665,9 +836,17 @@ function buildRagRelevanceTipHtml(r, subQuery) {
       '</div>'
     );
   }
+  if (!st) {
+    return (
+      '<b>Snippet-only relevance</b><div class="t-calc">No full-page RAG score for this row — common reasons: <code>BOOTK_DISABLE_RAG=1</code>, embedding model not loaded yet, or enrich did not set <code>rag_status</code>. The percent uses the <b>snippet heuristic</b> only (title + SERP snippet), not paywalled.' +
+      snippetFormula +
+      (ss != null ? '<br>Snippet score: <span class="t-val">' + escapeHtml(String(ss)) + '</span>' : '') +
+      '</div>'
+    );
+  }
   return (
     '<b>Relevance</b><div class="t-calc">RAG status: <code>' +
-    escapeHtml(String(st || '—')) +
+    escapeHtml(String(st)) +
     '</code>. Displayed value is max(available RAG, snippet) when applicable. Raw RAG: ' +
     (rs != null ? '<span class="t-val">' + escapeHtml(String(rs)) + '</span>' : '—') +
     '</div>'
@@ -699,11 +878,9 @@ function buildResearchCompletenessHtml(res) {
   const modeTip = registerTip(
     '<b>Critic mode</b><div class="t-calc"><b>LLM critic</b> — gpt-4o-mini scores completeness 0–1 from your original question plus a digest of titles/snippets from free search (same role as the critic node in deep_reasoning_researcher).<br><br><b>Heuristic fallback</b> — used when no OpenAI key is configured or the critic call failed. The percent blends how many sub-queries met their quality floor with the average best-hit relevance; “more info needed” uses gaps plus a low completeness threshold.</div>'
   );
-  const ref = rc.framework_ref || (res.v4 || {}).deep_research_framework_url || 'https://github.com/themiccc/deep_reasoning_researcher';
   return `
     <div class="dr-critic-block">
       <div class="fanout-title">Research completeness <span class="fanout-badge" data-tipid="${modeTip}" style="cursor:help">${escapeHtml(mode)}</span></div>
-      <p style="font-size:9px;color:var(--text-muted);line-height:1.45;margin:4px 0 0">Evaluates whether gathered search snippets look sufficient · determines if more search is needed (<a href="${escapeHtml(ref)}" target="_blank" rel="noopener">deep_reasoning_researcher</a> critic pattern).</p>
       <div class="dr-critic-row">
         <div class="dr-critic-metric" data-tipid="${pctTip}">
           <span class="dr-critic-lbl">Completeness</span>
@@ -714,35 +891,22 @@ function buildResearchCompletenessHtml(res) {
           <span class="dr-critic-val" style="font-size:15px">${escapeHtml(nm)}</span>
         </div>
       </div>
-      <div class="dr-critic-sum">${escapeHtml(rc.critic_summary || '')}</div>
-      <div class="dr-critic-foot">Hover the two metrics for plain-English definitions and formulas. We only use the upstream project&apos;s planner + critic ideas—not the full Tavily/LangGraph loop.</div>
     </div>`;
 }
 
 function buildFanoutSplit(res, sigs) {
+  const ft = getFanoutPillTips();
   const v4 = res.v4 || {};
   const runs = v4.sub_query_runs;
   const subs = sigs.sub_queries || [];
   const cov = v4.coverage != null ? String(v4.coverage) : '';
-  const qfo = sigs.query_fan_out || {};
-  const dejanUrl = v4.query_fan_out_reference || 'https://dejan.ai/blog/query-fan-out-prompt/';
-  const drUrl = qfo.planner_framework_url || v4.deep_research_framework_url || 'https://github.com/themiccc/deep_reasoning_researcher';
-  const policyStrip = v4.coverage_policy
-    ? `<div class="fanout-gap-line"><b>Coverage / gap:</b> ${escapeHtml(v4.coverage_policy)}</div>`
-    : '';
-  const rationaleBlock = `
-    <div class="fanout-dr">Targeted search tasks are produced with the <a href="${escapeHtml(drUrl)}" target="_blank" rel="noopener">deep_reasoning_researcher</a> <b>planner</b> pattern (open source)—break the question into distinct web queries; we do not run the rest of that repo&apos;s agent.</div>
-    ${qfo.rationale ? `<div class="fanout-rationale"><div class="fanout-rationale-hd">Planner rationale</div>${escapeHtml(qfo.rationale)}${qfo.source ? `<div class="fanout-src">Decomposition source: ${escapeHtml(String(qfo.source))}</div>` : ''}</div>` : ''}
-    <div class="fanout-dejan">Related ideas: <a href="${escapeHtml(dejanUrl)}" target="_blank" rel="noopener">query fan-out</a> (DEJAN) — prefer one search when enough; add queries only for distinct facets; recency.</div>`;
 
   if (!Array.isArray(runs) || !runs.length) {
     if (!Array.isArray(subs) || !subs.length) {
       return { subqueries: '', search: '', probe: '' };
     }
-    const cov2 = v4.coverage != null ? String(v4.coverage) : '';
     const rows = subs.map((sq, i) => {
       const sg = sq.signals || {};
-      const qt = sg.quality_threshold != null ? (sg.quality_threshold * 100).toFixed(0) + '%' : '—';
       const mp = sg.max_price_usd != null ? fmt$(sg.max_price_usd) : '—';
       const intent = sg.intent != null ? String(sg.intent) : '—';
       const domain = sg.domain != null ? String(sg.domain) : '—';
@@ -753,13 +917,12 @@ function buildFanoutSplit(res, sigs) {
           <span class="fanout-idx">${i + 1}</span>
           <div style="flex:1;min-width:0">
             <p class="fanout-q">${escapeHtml(sq.query || '')}</p>
-            ${sq.goal ? `<div class="fanout-goal"><span style="color:var(--text-muted);font-size:10px;text-transform:uppercase;letter-spacing:.06em">Goal · </span>${escapeHtml(sq.goal)}</div>` : ''}
+            ${(sq.goal || sq.research_objective) ? fmtGoalBlockPair(sq.goal, sq.research_objective) : ''}
             <div class="fanout-meta">
-              <span class="fanout-chip">intent: ${escapeHtml(intent)}</span>
-              <span class="fanout-chip">domain: ${escapeHtml(domain)}</span>
-              ${ctype ? `<span class="fanout-chip">content: ${escapeHtml(ctype)}</span>` : ''}
-              <span class="fanout-chip">quality floor: ${escapeHtml(qt)}</span>
-              <span class="fanout-chip">ceiling: ${escapeHtml(mp)}</span>
+              <span class="fanout-chip" data-tipid="${ft.intent}" style="cursor:help">intent: ${escapeHtml(intent)}</span>
+              <span class="fanout-chip" data-tipid="${ft.domain}" style="cursor:help">domain: ${escapeHtml(domain)}</span>
+              ${ctype ? `<span class="fanout-chip" data-tipid="${ft.content}" style="cursor:help">content: ${escapeHtml(ctype)}</span>` : ''}
+              <span class="fanout-chip" data-tipid="${ft.ceiling}" style="cursor:help">ceiling: ${escapeHtml(mp)}</span>
             </div>
           </div>
         </div>
@@ -769,45 +932,65 @@ function buildFanoutSplit(res, sigs) {
       subqueries: `
     <div class="fanout-block">
       <div class="fanout-title">
-        Query fanout
+        <span class="fanout-title-tip" data-tipid="${ft.queryFanoutHeading}">Query fanout</span>
         <span class="fanout-badge">${subs.length} sub-queries</span>
-        ${cov2 ? `<span class="fanout-badge">coverage ${escapeHtml(cov2)}</span>` : ''}
       </div>
       ${rows}
     </div>`,
       search: '<div class="fanout-nores" style="padding:10px 0">Brave free-tier hits appear when the response includes <code>sub_query_runs</code>.</div>',
-      probe: '<div class="fanout-nores" style="padding:10px 0">Valyu probe rows appear when the API returns probe data per sub-query.</div>'
+      probe: '<div class="fanout-nores" style="padding:10px 0">Valyu price-fetch rows appear when the response includes <code>sub_query_runs</code> with Valyu data per sub-query.</div>'
     };
   }
 
   const subParts = [];
   const searchParts = [];
   const probeParts = [];
+  const probePriceTipId = registerTip(
+    '<b>Valyu price rows</b><div class="t-calc"><b>Est. catalog</b> — rough per-article $ from our domain map (journals, news, markets, etc.); shown on every row for context.<br><br><b>Proprietary-only URL</b> — in Valyu&apos;s paid (proprietary) results for this query but not in the free index; Plan &amp; buy may use the catalog as an incremental paid ask when it is &gt; 0.<br><br><b>Also in free index</b> — same URL in both tiers: incremental ask is usually $0; catalog still shown.<br><br><b>Why one domain?</b> bootk does not filter to a publisher. If every row is e.g. Kalshi, Valyu&apos;s ranking plus your sub-query wording favored that index for this call.</div>'
+  );
   runs.forEach((run) => {
     const sg = (subs.find(s => s.query === run.query) || {}).signals || {};
     const mp = sg.max_price_usd != null ? fmt$(sg.max_price_usd) : '—';
     const intent = sg.intent != null ? String(sg.intent) : '—';
     const domain = sg.domain != null ? String(sg.domain) : '—';
     const ctype = sg.content_type_needed != null ? String(sg.content_type_needed) : '';
-    const st = run.coverage_status === 'gap' ? 'gap' : 'ok';
-    const stClass = run.coverage_status === 'gap' ? 'fanout-status-gap' : 'fanout-status-ok';
     const freeList = run.free_results || [];
-    const freeRows = freeList.length ? freeList.map(r => {
+    const sortedFree = freeList.length
+      ? [...freeList].sort((a, b) => {
+          const bf = isFullRagHit(b) ? 1 : 0;
+          const af = isFullRagHit(a) ? 1 : 0;
+          if (bf !== af) return bf - af;
+          return (Number(b.coverage_score) || 0) - (Number(a.coverage_score) || 0);
+        })
+      : [];
+    const freeRows = sortedFree.length ? sortedFree.map(r => {
             const rel = r.coverage_score != null ? Number(r.coverage_score) : 0;
             const covPct = (rel * 100).toFixed(0);
             const w = Math.min(100, Math.max(0, rel * 100));
             const ragTipId = registerTip(buildRagRelevanceTipHtml(r, run.query || ''));
-            const sub =
-              r.rag_score != null && r.rag_status === 'ok'
-                ? 'RAG max + snippet'
-                : r.rag_status === 'skip_paywall'
-                  ? 'Snippet only'
-                  : 'Snippet / partial';
+            const isPaywalled = r.rag_status === 'skip_paywall';
+            const fullRag = isFullRagHit(r);
+            const sub = ragRelevanceSubLabel(r);
+            const tierBadge = fullRag
+              ? `<span class="hit-tier-badge hit-tier-full" title="Full page HTML was fetched; body chunks were embedded (RAG).">Full page</span>`
+              : `<span class="hit-tier-badge hit-tier-snippet" title="Relevance uses title + snippet only (paywall, fetch failure, or short page).">Snippet / partial</span>`;
+            const paywallBadge = isPaywalled
+              ? `<span class="fanout-res-paywall-badge" title="This domain is on our soft-paywall skip list; we do not fetch full HTML. Scoring uses the search title and snippet only.">Paywalled</span>`
+              : '';
+            const paywallNote = isPaywalled
+              ? `<div class="fanout-res-paywall-note">Full article not retrieved — subscription / soft-paywall host. Text below is the search snippet only.</div>`
+              : '';
+            const rowExtra = fullRag ? ' fanout-res-rag-full' : (isPaywalled ? ' fanout-res-row-paywall' : ' fanout-res-row-snippet-only');
             return `
-        <div class="fanout-res-row">
+        <div class="fanout-res-row${rowExtra}">
           <div class="fanout-res-main">
-            <a class="fanout-res-title" href="${escapeHtml(r.url)}" target="_blank" rel="noopener">${escapeHtml(r.title || '(No title)')}</a>
+            <div style="display:flex;align-items:flex-start;gap:8px;flex-wrap:wrap;margin-bottom:2px">
+              <a class="fanout-res-title" href="${escapeHtml(r.url)}" target="_blank" rel="noopener" style="flex:1;min-width:0">${escapeHtml(r.title || '(No title)')}</a>
+              ${tierBadge}
+              ${paywallBadge}
+            </div>
             <div class="fanout-res-meta">${escapeHtml(r.source || '—')}</div>
+            ${paywallNote}
             ${r.snippet ? `<div class="fanout-res-snippet">${escapeHtml(r.snippet)}</div>` : ''}
           </div>
           <div class="rag-rel-box" data-tipid="${ragTipId}">
@@ -828,29 +1011,47 @@ function buildFanoutSplit(res, sigs) {
     let probeHtml = '';
     if (vyuErr) {
       probeHtml =
-        '<div class="fanout-nores" style="line-height:1.5">Valyu request failed (the probe ran but the API raised an error).<br><span style="opacity:.85;font-size:10px">' +
+        '<div class="fanout-nores" style="line-height:1.5">Valyu request failed during the price fetch (API error).<br><span style="opacity:.85;font-size:10px">' +
         escapeHtml(String(vyuErr)) +
         '</span></div>';
     } else if (plist.length) {
       const freeTierNote = onlyFree
-        ? '<div class="fanout-nores" style="margin-bottom:10px;line-height:1.45;border-left:2px solid rgba(57,211,83,.45);padding:6px 0 6px 10px">The <b>proprietary</b> Valyu search returned no URLs for this sub-query, but the <b>free index</b> did return matches — so Valyu is working; there is simply nothing extra behind the paid tier to show for this phrasing. (We also avoid <code style="font-size:9px">data_max_price=0</code> on proprietary search so the tier-diff call can return results.)</div>'
+        ? '<div class="fanout-nores" style="margin-bottom:10px;line-height:1.45;border-left:2px solid rgba(57,211,83,.45);padding:6px 0 6px 10px">The <b>proprietary</b> Valyu search returned no URLs for this sub-query, but the <b>free index</b> did return matches — Valyu is working; there is nothing extra behind the paid tier for this phrasing. (Proprietary search uses a non-zero <code style="font-size:9px">max_price</code> so the paid index can return results.)</div>'
         : '';
       probeHtml =
         freeTierNote +
-        `<div class="fanout-subhdr">Valyu probe (tier-diff)</div>
-          <div class="fanout-res-meta" style="margin-bottom:6px">free tier hits: ${pb.free_count} · paid tier hits: ${pb.paid_count} · new at paid: ${pb.new_at_paid}${pb.valyu_proprietary_cpm_used != null ? ' · proprietary CPM cap used: ' + escapeHtml(String(pb.valyu_proprietary_cpm_used)) : ''}</div>
-          ${plist.map(pr => `
+        `<div class="fanout-subhdr">Valyu price fetch</div>
+          <p class="fanout-valyu-lede" style="font-size:10px;line-height:1.5;margin:0 0 8px;color:var(--text-dim)">We run two Valyu searches: the <b>free web index</b> (<code style="font-size:9px">max_price=0</code>) and the <b>proprietary (paid) index</b>. The table below is built from the proprietary response, with our per-domain catalog $ overlay. <span style="opacity:.9">Domains are not restricted by bootk—if you only see one site, Valyu ranked those URLs highest for this sub-query.</span></p>
+          <div class="fanout-valyu-stats" style="font-size:10px;line-height:1.55;margin-bottom:8px;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background:rgba(127,127,127,.04)">
+            <div><b>Free index</b> — ${pb.free_count} hit(s)</div>
+            <div><b>Proprietary index</b> — ${pb.paid_count} hit(s)</div>
+            <div><b>URLs only in proprietary</b> — ${pb.new_at_paid} (not in free; Plan &amp; buy may treat these as paid-only when catalog &gt; 0)</div>
+            ${pb.valyu_proprietary_cpm_used != null ? `<div><b>Proprietary CPM cap</b> (sent to Valyu) — ${escapeHtml(String(pb.valyu_proprietary_cpm_used))}</div>` : ''}
+          </div>
+          <div class="fanout-res-meta" style="margin-bottom:8px;font-size:9px;line-height:1.45" data-tipid="${probePriceTipId}"><b>Rows</b> — estimated catalog $ per article from our domain map. <b>Plan &amp; buy</b> uses proprietary-only URLs when estimating a non-zero paid line item. <span style="cursor:help;border-bottom:1px dotted var(--text-muted)">Hover for glossary</span>.</div>
+          ${plist.map(pr => {
+            const cat = pr.estimated_catalog_usd != null ? Number(pr.estimated_catalog_usd) : null;
+            const inc = pr.incremental_paid_only === true;
+            const catStr = cat != null && !Number.isNaN(cat) ? ' · est. catalog ' + fmt$(cat) : '';
+            const tierStr = inc
+              ? ' · <span style="color:var(--yellow)">paid-tier only</span>'
+              : ' · <span style="opacity:.8">also in free index</span>';
+            const incAsk = pr.inferred_price != null && Number(pr.inferred_price) > 0
+              ? ' · incremental ask ' + fmt$(Number(pr.inferred_price))
+              : '';
+            return `
           <div class="fanout-res">
             <a class="fanout-res-title" href="${escapeHtml(pr.url)}" target="_blank" rel="noopener">${escapeHtml(pr.title || '(No title)')}</a>
-            <div class="fanout-res-meta">${escapeHtml(pr.source || '—')} · ${escapeHtml(pr.unlocked_at || '')}${pr.inferred_price != null ? ' · ~' + fmt$(Number(pr.inferred_price)) : ''}</div>
+            <div class="fanout-res-meta">${escapeHtml(pr.source || '—')} · ${escapeHtml(pr.unlocked_at || '')}${catStr}${tierStr}${incAsk}</div>
             ${pr.snippet ? `<div class="fanout-res-snippet">${escapeHtml(pr.snippet)}</div>` : ''}
-          </div>`).join('')}`;
+          </div>`;
+          }).join('')}`;
     } else if (skipped === 'free_tier_met' || run.coverage_status === 'ok') {
       probeHtml =
-        '<div class="fanout-nores">Free tier met the quality floor for this sub-query — no Valyu price probe was needed.</div>';
+        '<div class="fanout-nores">Free tier met the quality floor for this sub-query — no Valyu price fetch was needed.</div>';
     } else if (skipped === 'probe_budget_exhausted') {
       probeHtml =
-        '<div class="fanout-nores">Valyu probe skipped: this Optimize call already ran the maximum number of gap probes (see <code style="font-size:9px">MAX_VALYU_PROBES_PER_REQUEST</code> in the server env). Earlier gap sub-queries used the budget.</div>';
+        '<div class="fanout-nores">Valyu price fetch skipped: this Optimize call already hit the maximum number of gap fetches (see <code style="font-size:9px">MAX_VALYU_PROBES_PER_REQUEST</code> in the server env). Earlier gap sub-queries used the budget.</div>';
     } else if (run.coverage_status === 'gap' && attempted && !plist.length) {
       const counts =
         (pb.free_count != null ? Number(pb.free_count) : 0) +
@@ -865,11 +1066,13 @@ function buildFanoutSplit(res, sigs) {
           : '') +
         '</div>';
     }
-    const bc = run.best_coverage != null ? (run.best_coverage * 100).toFixed(0) : '—';
-    const fl = run.quality_threshold != null ? (run.quality_threshold * 100).toFixed(0) : '—';
     const gapLine = run.coverage_gap_detail
       ? `<div class="fanout-gap-line">${escapeHtml(run.coverage_gap_detail)}</div>`
       : '';
+
+    const isGap = run.coverage_status === 'gap';
+    const bcPct = run.best_coverage != null ? (run.best_coverage * 100).toFixed(0) : '—';
+    const flPct = run.quality_threshold != null ? (run.quality_threshold * 100).toFixed(0) : '—';
 
     subParts.push(`
       <div class="fanout-item" id="fanout-run-${run.index}" data-sq-index="${run.index}">
@@ -877,73 +1080,100 @@ function buildFanoutSplit(res, sigs) {
           <span class="fanout-idx">${run.index}</span>
           <div style="flex:1;min-width:0">
             <p class="fanout-q">${escapeHtml(run.query || '')}</p>
-            ${run.goal ? `<div class="fanout-goal"><span style="color:var(--text-muted);font-size:10px;text-transform:uppercase;letter-spacing:.06em">Goal · </span>${escapeHtml(run.goal)}</div>` : ''}
+            ${(run.goal || run.research_objective) ? fmtGoalBlockPair(run.goal, run.research_objective) : ''}
             <div class="fanout-meta">
-              <span class="fanout-chip">provider: ${escapeHtml(String(run.search_provider || '—'))}</span>
-              <span class="fanout-chip">best relevance: ${bc}%</span>
-              <span class="fanout-chip">floor: ${fl}%</span>
-              <span class="fanout-chip ${stClass}">${st}</span>
-              <span class="fanout-chip">intent: ${escapeHtml(intent)}</span>
-              <span class="fanout-chip">domain: ${escapeHtml(domain)}</span>
-              ${ctype ? `<span class="fanout-chip">content: ${escapeHtml(ctype)}</span>` : ''}
-              <span class="fanout-chip">ceiling: ${escapeHtml(mp)}</span>
+              <span class="fanout-chip" data-tipid="${ft.intent}" style="cursor:help">intent: ${escapeHtml(intent)}</span>
+              <span class="fanout-chip" data-tipid="${ft.domain}" style="cursor:help">domain: ${escapeHtml(domain)}</span>
+              ${ctype ? `<span class="fanout-chip" data-tipid="${ft.content}" style="cursor:help">content: ${escapeHtml(ctype)}</span>` : ''}
+              <span class="fanout-chip" data-tipid="${ft.ceiling}" style="cursor:help">ceiling: ${escapeHtml(mp)}</span>
             </div>
-            ${gapLine}
           </div>
         </div>
       </div>`);
     const qHead = (run.query || '').length > 90 ? escapeHtml((run.query || '').slice(0, 90)) + '…' : escapeHtml(run.query || '');
+    const qHeadCell = isGap
+      ? `<span class="search-sq-query-link" role="button" tabindex="0" title="Open Price fetch tab for this sub-query (may need paid source)" onclick="event.preventDefault();event.stopPropagation();goToProbeSubquery(${run.index})">${qHead}</span>`
+      : `<span>${qHead}</span>`;
+    const covPill = isGap
+      ? `<button type="button" class="search-cov-pill search-cov-gap" title="Open Price fetch for this sub-query" onclick="event.preventDefault();event.stopPropagation();goToProbeSubquery(${run.index})">GAP</button><span class="search-cov-meta">best ${bcPct}% · floor ${flPct}%</span>`
+      : `<span class="search-cov-pill search-cov-ok">OK</span><span class="search-cov-meta">best ${bcPct}% · floor ${flPct}%</span>`;
+    const probeBtn = isGap
+      ? `<button type="button" class="search-pricefetch-jump" data-pricefetch-jump="${run.index}" onclick="event.preventDefault();event.stopPropagation();goToProbeSubquery(${run.index})" title="Open Price fetch tab (Valyu paid-tier check)">Price fetch →</button>`
+      : '';
     searchParts.push(`
-      <details class="fanout-search-details" data-sq-index="${run.index}">
+      <details class="fanout-search-details${isGap ? ' fanout-search-gap' : ''}" data-sq-index="${run.index}" id="search-sq-${run.index}">
         <summary class="fanout-search-sum">
           <span class="fanout-idx" style="margin-right:6px">${run.index}</span>
-          <span style="flex:1;min-width:0">${qHead}</span>
+          <span style="flex:1;min-width:0">${qHeadCell}</span>
+          ${covPill}
           <span style="color:var(--text-muted);font-size:9px">${freeList.length} hits</span>
+          ${probeBtn}
         </summary>
         <div class="fanout-search-body">
           ${gapLine}
-          <div class="fanout-subhdr">Hover <b>Relevance</b> for RAG · snippet formula if fetch fails</div>
+          <div class="fanout-subhdr">Hits with <b>full-page RAG</b> are listed first. Badges show <b>Full page</b> vs <b>Snippet / partial</b>. Hover <b>Relevance</b> for the score breakdown (snippet formula when fetch fails).</div>
           ${freeRows}
         </div>
       </details>`);
 
     const probeBody =
       probeHtml ||
-      '<div class="fanout-nores">No Valyu probe data for this sub-query.</div>';
+      '<div class="fanout-nores">No Valyu price-fetch data for this sub-query.</div>';
+    const covForProbe = run.coverage_status === 'gap'
+      ? `<div class="hit-cov-badge hit-cov-gap" style="margin-bottom:8px">Free-tier coverage · <b>GAP</b> — best Brave hit is still below the quality floor (Valyu may run to price paid inventory).</div>`
+      : `<div class="hit-cov-badge hit-cov-ok" style="margin-bottom:8px">Free-tier coverage · <b>OK</b> — floor met or no probe needed for this sub-query.</div>`;
     probeParts.push(`
-      <div class="fanout-item" data-sq-index="${run.index}">
+      <div class="fanout-item" id="probe-run-${run.index}" data-sq-index="${run.index}">
         <div class="fanout-item-hd">
           <span class="fanout-idx">${run.index}</span>
           <div style="flex:1;min-width:0">
             <p class="fanout-q">${escapeHtml(run.query || '')}</p>
+            ${covForProbe}
             ${probeBody}
           </div>
         </div>
       </div>`);
   });
 
-  const coverageBadgeTipId = cov
-    ? registerTip(
-        '<b>Coverage ' +
-          escapeHtml(cov) +
-          '</b><div class="t-calc">This fraction counts <b>sub-queries covered by the plan</b> (best free hit met that sub-query’s quality floor, or we bought a paid hit after probing) out of all sub-queries we ran. It is separate from the Valyu panel: tier-diff probes run only on <b>gap</b> sub-queries (best free relevance below the floor), up to <code>MAX_VALYU_PROBES_PER_REQUEST</code> probes per Optimize.</div>'
-      )
-    : '';
-  const titleRow = (label) => `
+  const gapIndices = runs.filter(r => r.coverage_status === 'gap').map(r => r.index);
+  let searchLegend = '';
+  if (runs.length) {
+    if (gapIndices.length) {
+      const gapLead =
+        gapIndices.length === 1
+          ? `Sub-query <b>#${gapIndices[0]}</b> is`
+          : `Sub-queries <b>${gapIndices.map(i => '#' + i).join(', ')}</b> are`;
+      searchLegend =
+        `<div class="search-coverage-legend search-coverage-legend-gap"><span style="display:block;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px">Free-tier coverage</span>` +
+        `${gapLead} <b>GAP</b> — best free relevance is still below the quality floor, so a <b>paid</b> source may be needed.</div>`;
+    } else {
+      searchLegend =
+        '<div class="search-coverage-legend search-coverage-legend-allok"><span style="display:block;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px">Free-tier coverage</span>All sub-queries: <b>OK</b> — best free hit met or exceeded the quality floor (or no hits to compare).</div>';
+    }
+  }
+
+  const covBadge = cov ? coverageBadgeTipRegister(cov) : null;
+  const titleRow = (label, labelTipId, includeCoverage) => {
+    const showCov = includeCoverage !== false && covBadge;
+    const lab = labelTipId
+      ? `<span class="fanout-title-tip" data-tipid="${labelTipId}">${escapeHtml(label)}</span>`
+      : escapeHtml(label);
+    return `
       <div class="fanout-title">
-        ${label}
+        ${lab}
         <span class="fanout-badge">${runs.length} sub-queries</span>
         ${
-          cov
-            ? `<span class="fanout-badge" data-tipid="${coverageBadgeTipId}" style="cursor:help">coverage ${escapeHtml(cov)}</span>`
+          showCov
+            ? `<span class="fanout-badge${covBadge.warn ? ' fanout-badge-warn' : ''}" data-tipid="${covBadge.tipId}" style="cursor:help">coverage ${escapeHtml(cov)}</span>`
             : ''
         }
       </div>`;
+  };
 
   return {
-    subqueries: `<div class="fanout-block">${titleRow('Query fanout')}${policyStrip}${rationaleBlock}${subParts.join('')}</div>`,
-    search: `<div class="fanout-block">${titleRow('Brave search (free tier)')}${policyStrip}${searchParts.join('')}</div>`,
-    probe: `<div class="fanout-block">${titleRow('Valyu probe (tier-diff)')}${probeParts.join('')}</div>`
+    subqueries: `<div class="fanout-block">${titleRow('Query fanout', ft.queryFanoutHeading, false)}${subParts.join('')}</div>`,
+    search: `<div class="fanout-block">${titleRow('Brave search (free tier)')}${searchLegend}${searchParts.join('')}</div>`,
+    probe: `<div class="fanout-block">${titleRow('Valyu price fetch')}${probeParts.join('')}</div>`
   };
 }
 
@@ -995,9 +1225,15 @@ function buildPlanTabHtml(res) {
 
   const bidCeil = bid_ceiling != null ? `Value ceiling: $${bid_ceiling.toFixed(3)} (from stakes + credibility + freshness)` : '';
   const pipelineRight = buildPipelineRightBlock(res);
+  const scNum = Number(smartCost);
+  const zeroPlanNote =
+    Number.isFinite(scNum) && scNum <= 0
+      ? `<div class="plan-summary-box"><b>Optimized cost is $0</b> — no priced inventory was selected (free sources only, or no paid asks). The run still includes decomposition, Brave search, Valyu when there is a <b>coverage gap</b>, bid evaluation, and an <b>answer</b> synthesized from gathered evidence. A positive total means at least one paid ask was included in the plan.</div>`
+      : '';
 
   return `
   <div class="fade-in">
+    ${zeroPlanNote}
     ${pipelineRight}
     <div class="right-tabs">
       <div class="right-tab active" data-tab="plan" onclick="switchRightTab('plan')">Plan</div>
@@ -1043,34 +1279,34 @@ function buildPlanTabHtml(res) {
   </div>`;
 }
 
-let currentMainTab = 'subqueries';
+let currentMainTab = 'signals';
 
-function switchMainTab(tab) {
+function switchMainTab(tab, opts) {
   currentMainTab = tab;
-  document.querySelectorAll('.main-tab').forEach(t => {
+  document.querySelectorAll('.pipe-step').forEach(t => {
     t.classList.toggle('active', t.dataset.mainTab === tab);
   });
-  const map = { subqueries: 'mtpSubqueries', signals: 'mtpSignals', search: 'mtpSearch', probe: 'mtpProbe', plan: 'mtpPlan' };
+  const map = { subqueries: 'mtpSubqueries', signals: 'mtpSignals', search: 'mtpSearch', probe: 'mtpProbe', plan: 'mtpPlan', answer: 'mtpAnswer' };
   Object.entries(map).forEach(([k, id]) => {
     const el = document.getElementById(id);
     if (el) el.style.display = k === tab ? 'block' : 'none';
   });
+  if (!opts || !opts.silent) appendPipelineLogLine(null, 'Tab · ' + tab);
 }
 
 function renderDetail(res) {
   lastRightRes = res;
-  currentMainTab = 'subqueries';
+  currentMainTab = 'signals';
   const sigs = res.sigs || {};
   const {intent, matchedTemplate} = sigs;
   const entities = Array.isArray(sigs.entities) ? sigs.entities : [];
   const F  = sigs.freshness || { required: false, timeMarkers: [] };
   const im = INTENT_META[intent]||INTENT_META.explainer;
-  const so = buildSigObjects(sigs);
   const fan = buildFanoutSplit(res, sigs);
 
   const intentBlock = `
     <div style="margin-bottom:14px">
-      <div style="font-size:9px;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:7px">Intent Detected</div>
+      <div style="font-size:9px;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:7px">Whole-query intent</div>
       <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">
         <span class="intent-badge" style="color:${im.color};background:${im.bg};border:1px solid ${im.color}40">● ${im.label}</span>
         ${F.required?'<span class="intent-badge" style="color:var(--red);background:rgba(248,81,73,.1);border:1px solid rgba(248,81,73,.2)">⚡ FRESHNESS CRITICAL</span>':''}
@@ -1079,121 +1315,52 @@ function renderDetail(res) {
       ${entities.length?`<div style="font-size:9px;color:var(--text-muted);margin-top:7px">entities: <span style="color:var(--text-dim)">${entities.slice(0,7).join(', ')}</span></div>`:''}
     </div>`;
 
-  const composedBlock = `
-    <div style="font-size:9px;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px">Composed Dimension Scores</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:16px">
-      ${Object.entries({relevance:so.relevance.composed,credibility:so.credibility.composed,freshness:so.freshness.composed,depth:so.depth.composed}).map(([k,v])=>{
-        const dm = DIM_META[k];
-        return `<div class="composed-card">
-          <div class="cc-label" style="color:${dm.color}">
-            <span style="width:5px;height:5px;border-radius:50%;background:${dm.color};display:inline-block;flex-shrink:0"></span>
-            ${dm.label}
-          </div>
-          <div class="cc-val" style="color:${dm.color}">${pct(v)}</div>
-          <div style="height:3px;background:var(--surface3);border-radius:2px;margin-top:7px;overflow:hidden">
-            <div style="height:100%;width:${pct(v)};background:${dm.color};border-radius:2px;transition:width .8s .1s"></div>
-          </div>
-        </div>`;
-      }).join('')}
+  const simpleSignalsQb = (function(){
+    const qu = sigs.queryUnderstanding;
+    if (!qu) return '';
+    const pi = qu.purchase_intent || {};
+    const ent = Array.isArray(qu.entity_linking) ? qu.entity_linking : [];
+    const fr = F.required
+      ? `${escapeHtml(String(pi.freshness_requirement || '—'))} · max ${escapeHtml(String(sigs.maxFreshnessHours != null ? sigs.maxFreshnessHours : '—'))}h`
+      : escapeHtml(String(pi.freshness_requirement || '—'));
+    return `
+    <div class="signals-simple-qb">
+      <div class="ss-row"><span class="ss-k">Content</span><span class="ss-v">${escapeHtml(pi.content_type_needed || '—')}</span></div>
+      <div class="ss-row"><span class="ss-k">Domain</span><span class="ss-v">${escapeHtml(pi.topical_domain || '—')}</span></div>
+      <div class="ss-row"><span class="ss-k">Freshness</span><span class="ss-v">${fr}</span></div>
+      <div class="ss-row"><span class="ss-k">Quality floor</span><span class="ss-v">${pi.quality_threshold != null ? (pi.quality_threshold * 100).toFixed(0) + '%' : '—'}</span></div>
+      ${ent.length ? `<div class="ss-row"><span class="ss-k">Entities</span><span class="ss-v">${escapeHtml(ent.slice(0, 12).join(', '))}</span></div>` : ''}
     </div>`;
+  })();
 
-  const qbBlock = (function(){
-      const qu = sigs.queryUnderstanding;
-      if (!qu) return '';
-      const pi = qu.purchase_intent || {};
-      const entities = Array.isArray(qu.entity_linking) ? qu.entity_linking : [];
-      const rules = Array.isArray(qu.routing_rules_fired) ? qu.routing_rules_fired : [];
-      return `
-    <div class="query-breakdown">
-      <div class="qb-title">Query breakdown <span>· intent → routing → tier</span></div>
-      <div class="qb-row"><span class="qb-k">Content type</span><span class="qb-v">${pi.content_type_needed || '—'}</span></div>
-      <div class="qb-row"><span class="qb-k">Topical domain</span><span class="qb-v">${pi.topical_domain || '—'}</span></div>
-      <div class="qb-row"><span class="qb-k">Freshness need</span><span class="qb-v">${pi.freshness_requirement || '—'}</span></div>
-      <div class="qb-row"><span class="qb-k">Quality floor</span><span class="qb-v">${(pi.quality_threshold != null ? (pi.quality_threshold * 100).toFixed(0) + '%' : '—')}</span></div>
-      <div class="qb-row"><span class="qb-k">Entity linking</span><span class="qb-v">${entities.length ? entities.slice(0,8).join(', ') + (entities.length > 8 ? ' …' : '') : '—'}</span></div>
-      <div class="qb-row"><span class="qb-k">Intent template</span><span class="qb-v">${qu.intent_template || '—'}</span></div>
-      <div class="qb-row"><span class="qb-k">Trending signal</span><span class="qb-v">${qu.trending_signal ? 'yes' : 'no'}</span></div>
-      <div class="qb-row"><span class="qb-k">Query cluster</span><span class="qb-v" style="font-family:'IBM Plex Mono',monospace;font-size:9px">${qu.query_cluster || '—'}</span></div>
-      <div class="qb-row"><span class="qb-k">Tier strategy</span><span class="qb-v">${qu.tier_strategy || '—'}</span></div>
-      ${rules.length ? `<div class="qb-row"><span class="qb-k">Routing rules</span><div class="qb-v"><div class="qb-chips">${rules.map(r=>'<span class="qb-chip">'+r+'</span>').join('')}</div></div></div>` : ''}
-    </div>
-    `;
-    })();
+  const rcHtml = buildResearchCompletenessHtml(res) || '';
+  const signalsPanel = `<div class="fade-in signals-panel-simple">
+    <div class="signals-core">${intentBlock}</div>
+    ${simpleSignalsQb}
+    ${rcHtml}
+  </div>`;
 
-  const dimBlocks = `
-    <div class="dim-section">
-      <div class="dim-header">
-        <span class="dim-tag" style="background:rgba(56,139,253,.1);color:var(--d-relevance)">D1 · Relevance</span>
-        <span class="dim-desc">how specific & matched must the content be</span>
-        <span class="dim-composed" style="color:var(--d-relevance)">${pct(so.relevance.composed)}</span>
-      </div>
-      ${sigRow('Semantic Match',       'keyword cosine sim vs. intent profiles',       so.relevance.semantic,      'var(--d-relevance)')}
-      ${sigRow('Entity Density',       'FB §3.1 entity linking · spaCy NER (case-insensitive)',  so.relevance.entityDensity, 'var(--d-relevance)')}
-      ${sigRow('Specificity',          'narrow (high) vs. broad query (low)',           so.relevance.specificity,   'var(--d-relevance)')}
-      ${sigRow('Template Match Boost', 'FB §3.1 intent template · structural pattern', so.relevance.templateBoost, 'var(--d-relevance)', matchedTemplate?{text:matchedTemplate.label,color:'var(--text-dim)',bg:'var(--surface3)'}:null)}
-    </div>
-    <div class="dim-section">
-      <div class="dim-header">
-        <span class="dim-tag" style="background:rgba(210,153,34,.1);color:var(--d-credibility)">D2 · Credibility</span>
-        <span class="dim-desc">how authoritative the source must be</span>
-        <span class="dim-composed" style="color:var(--d-credibility)">${pct(so.credibility.composed)}</span>
-      </div>
-      ${sigRow('Stakes Level',      'decision-making vs. info-seeking',     so.credibility.stakes,        'var(--d-credibility)',
-        so.credibility.stakes.v>.80?{text:'HIGH',color:'#f85149',bg:'rgba(248,81,73,.12)'}:
-        so.credibility.stakes.v>.55?{text:'MED', color:'#d29922',bg:'rgba(210,153,34,.12)'}:
-        {text:'LOW',color:'#3fb950',bg:'rgba(63,185,80,.12)'})}
-      ${sigRow('Domain Sensitivity','medical / legal / financial',          so.credibility.sensitivity,   'var(--d-credibility)')}
-      ${sigRow('Corroboration',     'independent sources needed',           so.credibility.corroboration, 'var(--d-credibility)',
-        so.credibility.corroboration.v>.60?{text:`≥${sigs.minSources} sources`,color:'#d29922',bg:'rgba(210,153,34,.12)'}:
-        {text:'1 source',color:'var(--text-muted)',bg:'var(--surface3)'})}
-      ${sigRow('Controversy',       'multiple perspectives required',       so.credibility.controversy,   'var(--d-credibility)')}
-    </div>
-    <div class="dim-section">
-      <div class="dim-header">
-        <span class="dim-tag" style="background:rgba(248,81,73,.1);color:var(--d-freshness)">D3 · Freshness</span>
-        <span class="dim-desc">how time-sensitive the content must be${F.required?' · <span style="color:var(--red)">max '+sigs.maxFreshnessHours+'h</span>':''}</span>
-        <span class="dim-composed" style="color:var(--d-freshness)">${pct(so.freshness.composed)}</span>
-      </div>
-      ${sigRow('Velocity / Trending', 'FB §3.1 trending detection · time keywords',  so.freshness.velocity,        'var(--d-freshness)',
-        so.freshness.velocity.v>=.90?{text:'REAL-TIME',color:'#f85149',bg:'rgba(248,81,73,.12)'}:
-        so.freshness.velocity.v>=.60?{text:'RECENT',   color:'#d29922',bg:'rgba(210,153,34,.12)'}:
-        {text:'ARCHIVAL',color:'var(--text-muted)',bg:'var(--surface3)'})}
-      ${sigRow('Temporal Markers',    'extracted time refs: today / Q1 / year',       so.freshness.temporalMarkers, 'var(--d-freshness)',
-        F.timeMarkers.length?{text:F.timeMarkers[0],color:'var(--text-dim)',bg:'var(--surface3)'}:null)}
-      ${sigRow('Event Urgency',       'earnings / rate decision / IPO detected',       so.freshness.eventUrgency,    'var(--d-freshness)')}
-      ${sigRow('Decay Rate',          'how fast this topic type goes stale',           so.freshness.decayRate,       'var(--d-freshness)')}
-    </div>
-    <div class="dim-section">
-      <div class="dim-header">
-        <span class="dim-tag" style="background:rgba(188,140,255,.1);color:var(--d-depth)">D4 · Depth</span>
-        <span class="dim-desc">novel · not in FB paper or vLLM router</span>
-        <span class="dim-composed" style="color:var(--d-depth)">${pct(so.depth.composed)}</span>
-      </div>
-      ${sigRow('Query Complexity',    'analytical language + query length',            so.depth.complexity,     'var(--d-depth)')}
-      ${sigRow('Answer Depth Req.',   'headline vs. deep-dive needed',                 so.depth.depthRequired,  'var(--d-depth)')}
-      ${sigRow('Question Type',       'Broder 2002 taxonomy (cited in FB paper)',      so.depth.questionType,   'var(--d-depth)',
-        {text:so.depth.questionType.raw||'informational',color:'var(--text-dim)',bg:'var(--surface3)'})}
-      ${sigRow('Ambiguity / Hedge',   'multiple angles needed to resolve',             so.depth.ambiguity,      'var(--d-depth)')}
-    </div>`;
-
-  const signalsPanel = `<div class="fade-in">${intentBlock}${composedBlock}${qbBlock}${dimBlocks}</div>`;
-
-  const subPanel = (buildResearchCompletenessHtml(res) || '') + (fan.subqueries || '<div class="fanout-nores">No fan-out data in this response.</div>');
+  const subPanel = (fan.subqueries || '<div class="fanout-nores">No fan-out data in this response.</div>');
   const searchPanel = `<div class="fade-in">${fan.search || ''}</div>`;
 
-  const probePanel = `<div class="fade-in">${fan.probe || '<div class="fanout-nores">No probe data.</div>'}</div>`;
+  const probePanel = `<div class="fade-in">${fan.probe || '<div class="fanout-nores">No price-fetch data.</div>'}</div>`;
   const planPanel = buildPlanTabHtml(res);
+  const answerPanel = buildSynthesizePanelHtml(res);
 
   document.getElementById('detailP').innerHTML = `
   <div class="detail-tab-stack">
-    <div id="mtpSubqueries" class="main-tab-panel">${subPanel}</div>
-    <div id="mtpSignals" class="main-tab-panel" style="display:none">${signalsPanel}</div>
+    <div id="mtpSignals" class="main-tab-panel">${signalsPanel}</div>
+    <div id="mtpSubqueries" class="main-tab-panel" style="display:none">${subPanel}</div>
     <div id="mtpSearch" class="main-tab-panel" style="display:none">${searchPanel}</div>
     <div id="mtpProbe" class="main-tab-panel" style="display:none">${probePanel}</div>
     <div id="mtpPlan" class="main-tab-panel" style="display:none">${planPanel}</div>
+    <div id="mtpAnswer" class="main-tab-panel" style="display:none">${answerPanel}</div>
   </div>`;
 
-  switchMainTab(currentMainTab);
+  stopOptimizeClientLog();
+  mergeServerPipelineLog(res);
+
+  switchMainTab(currentMainTab, { silent: true });
 
   setTimeout(()=>{
     document.querySelectorAll('.pi').forEach(el=>setTimeout(()=>el.classList.add('vis'),50));
@@ -1221,9 +1388,82 @@ function fmtBig(n){
 
 let lastRightRes = null;
 let lastOptimizeRes = null;
-let selectedSqIndex = 1;
-
 let optimizeProgressTimer = null;
+let optimizeClientLogTimer = null;
+let pipelineLogDrawerOpen = false;
+
+function pipelineLogStamp() {
+  return new Date().toISOString().slice(11, 23);
+}
+
+function appendPipelineLogLine(t, msg) {
+  const ts = t != null && String(t).trim() ? String(t).trim() : pipelineLogStamp();
+  const body = document.getElementById('pipelineLogBody');
+  if (!body) return;
+  const first = body.firstElementChild;
+  if (first && /Run Optimize|append entries/i.test(first.textContent || '')) {
+    first.remove();
+  }
+  const line = document.createElement('div');
+  line.className = 'pld-line';
+  line.innerHTML = '<span class="pld-t">' + escapeHtml(ts) + '</span>' + escapeHtml(msg || '');
+  body.appendChild(line);
+  if (pipelineLogDrawerOpen) body.scrollTop = body.scrollHeight;
+}
+
+function resetPipelineLogUi() {
+  const body = document.getElementById('pipelineLogBody');
+  if (body) body.innerHTML = '';
+}
+
+function startOptimizeClientLog() {
+  if (optimizeClientLogTimer) {
+    clearInterval(optimizeClientLogTimer);
+    optimizeClientLogTimer = null;
+  }
+  resetPipelineLogUi();
+  appendPipelineLogLine(null, 'POST /optimize …');
+  const hints = ['Decomposing query…', 'Signals & routing…', 'Brave search & RAG…', 'Price fetch / Valyu…', 'Plan, bids & writer…'];
+  let i = 0;
+  optimizeClientLogTimer = setInterval(function () {
+    if (i < hints.length) appendPipelineLogLine(null, hints[i++]);
+  }, 2200);
+}
+
+function stopOptimizeClientLog() {
+  if (optimizeClientLogTimer) {
+    clearInterval(optimizeClientLogTimer);
+    optimizeClientLogTimer = null;
+  }
+}
+
+function mergeServerPipelineLog(res) {
+  const pl = (res.v4 || {}).pipeline_log;
+  if (!Array.isArray(pl) || !pl.length) return;
+  appendPipelineLogLine(null, '— server log —');
+  pl.forEach(function (e) {
+    appendPipelineLogLine(e.t, e.msg || '');
+  });
+}
+
+function togglePipelineLogDrawer() {
+  const dr = document.getElementById('pipelineLogDrawer');
+  if (!dr) return;
+  const on = !dr.classList.contains('on');
+  dr.classList.toggle('on', on);
+  dr.setAttribute('aria-hidden', on ? 'false' : 'true');
+  pipelineLogDrawerOpen = on;
+  const body = document.getElementById('pipelineLogBody');
+  if (on && body) body.scrollTop = body.scrollHeight;
+}
+
+function closePipelineLogDrawer() {
+  const dr = document.getElementById('pipelineLogDrawer');
+  if (!dr) return;
+  dr.classList.remove('on');
+  dr.setAttribute('aria-hidden', 'true');
+  pipelineLogDrawerOpen = false;
+}
 
 function startOptimizeProgress(){
   stopOptimizeProgress(false);
@@ -1235,7 +1475,7 @@ function startOptimizeProgress(){
   lab.textContent = 'Starting…';
   fill.style.width = '3%';
   const t0 = Date.now();
-  const labels = ['Decomposing…', 'Signals & routing…', 'Search & RAG…', 'Probes & plan…', 'Finishing…'];
+  const labels = ['Decomposing…', 'Signals & routing…', 'Search & RAG…', 'Price fetch & plan…', 'Finishing…'];
   const span = 120000;
   function tick(){
     const elapsed = Date.now() - t0;
@@ -1286,45 +1526,30 @@ function renderPipelineLoading(){
 function renderPipelineViz(res){
   hidePipeProgress();
   lastOptimizeRes = res;
-  const v4 = res.v4 || {};
-  const runs = v4.sub_query_runs;
-  if (Array.isArray(runs) && runs.length) {
-    if (!runs.some(r => r.index === selectedSqIndex)) selectedSqIndex = runs[0].index;
-    selectSubQuery(selectedSqIndex);
-  }
 }
 
-function selectSubQuery(idx){
-  switchMainTab('subqueries');
-  selectedSqIndex = idx;
-  document.querySelectorAll('.fanout-item').forEach(el => {
-    el.classList.toggle('fanout-item-sel', +el.dataset.sqIndex === +idx);
-  });
-  document.querySelectorAll('.fanout-search-details').forEach(el => {
-    el.classList.toggle('fanout-search-sel', +el.dataset.sqIndex === +idx);
-  });
-  const detail = document.getElementById('panelDetail');
-  const target = document.getElementById('fanout-run-' + idx);
-  if (target && detail) {
-    const mr = detail.getBoundingClientRect();
-    const tr = target.getBoundingClientRect();
-    if (tr.top < mr.top || tr.bottom > mr.bottom) target.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+/** From Search tab: jump to Price fetch tab for one sub-query (e.g. GAP — may need paid source). */
+function goToProbeSubquery(idx) {
+  switchMainTab('probe');
+  const target = document.getElementById('probe-run-' + idx);
+  if (target) {
+    target.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+  if (target) {
+    target.classList.remove('pricefetch-flash');
+    void target.offsetWidth;
+    target.classList.add('pricefetch-flash');
   }
 }
 
 function buildPipelineRightBlock(res){
   const v4 = res.v4 || {};
-  const pl = v4.pipeline_log || [];
   const fs = v4.free_sources || [];
   const ps = v4.paid_sources || [];
   const totalBid = v4.total_bid != null ? v4.total_bid : res.smartCost;
   const naiveT = v4.naive_total != null ? v4.naive_total : res.naiveCost;
   const savePct = v4.savings_vs_naive != null ? v4.savings_vs_naive : res.savingsPct;
-  if (!pl.length && !fs.length && !ps.length && !v4.sub_query_runs) return '';
-  let logHtml = '';
-  if (pl.length) {
-    logHtml = `<div class="rp-hdr">Pipeline log</div><div class="rp-log">${pl.map(e => `<div class="rp-log-line"><span class="rp-t">${escapeHtml(e.t || '')}</span>${escapeHtml(e.msg || '')}</div>`).join('')}</div>`;
-  }
+  if (!fs.length && !ps.length && !v4.sub_query_runs) return '';
   let synRows = '';
   fs.forEach(s => {
     synRows += `<div class="rp-syn-row"><span>${escapeHtml(s.source || s.title || '—')}</span><span class="rp-syn-tag">FREE</span></div>`;
@@ -1335,7 +1560,23 @@ function buildPipelineRightBlock(res){
   });
   if (!synRows) synRows = '<div style="font-size:10px;color:var(--text-muted);padding:4px 0">No line items (empty plan)</div>';
   const synHtml = `<div class="rp-hdr">Synthesis preview</div><div class="rp-syn">${synRows}<div class="rp-syn-sum">Total bid <b>${fmt$(totalBid)}</b> · vs naive ${fmt$(naiveT)} · <b>${(savePct != null ? Number(savePct).toFixed(1) : '0')}%</b> saved</div></div>`;
-  return `<div class="rp-pipeline-block">${logHtml}${synHtml}</div>`;
+  return `<div class="rp-pipeline-block">${synHtml}</div>`;
+}
+
+function buildSynthesizePanelHtml(res) {
+  const syn = (res.v4 || {}).synthesis || {};
+  const mode = syn.mode != null ? String(syn.mode) : '—';
+  const text = syn.text != null ? String(syn.text) : '';
+  const line = syn.summary_line != null ? String(syn.summary_line) : '';
+  const body = text.trim()
+    ? `<div class="answer-panel-body">${escapeHtml(text)}</div>`
+    : `<div class="fanout-nores" style="padding:8px 0">No synthesized answer text in this response (configure an OpenAI key on the server for the writer step).</div>`;
+  return `
+  <div class="fade-in">
+    <div class="fanout-title" style="margin-bottom:10px">Answer <span class="fanout-badge">${escapeHtml(mode)}</span></div>
+    ${line ? `<div style="font-size:11px;color:var(--text-muted);margin-bottom:12px;line-height:1.5">${escapeHtml(line)}</div>` : ''}
+    ${body}
+  </div>`;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1346,23 +1587,35 @@ const MIN_OPTIMIZE_DISPLAY_DELAY_MS = 1200;
 
 function showOptimizeLoading(){
   renderPipelineLoading();
+  startOptimizeClientLog();
   document.getElementById('detailP').innerHTML = `
     <div class="optimize-loading">
       <div class="ol-spinner"></div>
       <div class="ol-text">Running pipeline…</div>
-      <div style="font-size:9px;opacity:.6">decomp · signals · search · probe · plan</div>
+      <div style="font-size:9px;opacity:.6">decomp · signals · search · price fetch · plan · answer</div>
     </div>`;
 }
 
 const OPTIMIZE_FETCH_TIMEOUT_MS = 120000;
 
-function showOptimizeFailed(message){
+function showOptimizeFailed(message, hintKind){
   stopOptimizeProgress(false);
+  stopOptimizeClientLog();
+  appendPipelineLogLine(null, 'Failed: ' + (message || '').trim());
+  const m = (message || '').trim();
+  let hint = '';
+  if (hintKind === 'network' || /^failed to fetch$/i.test(m) || /load failed|networkerror/i.test(m)) {
+    hint = 'The browser could not reach the app. Start the server (e.g. <code style="font-size:9px">python app.py</code> or gunicorn), open this page from that origin (not <code style="font-size:9px">file://</code>), and use the same host/port as the API.';
+  } else if (hintKind === 'timeout') {
+    hint = 'First run can be slow while the embedding model downloads. Set <code style="font-size:9px">BOOTK_DISABLE_RAG=1</code> in <code style="font-size:9px">.env</code> for snippet-only scoring until the model is cached, then retry.';
+  } else {
+    hint = 'If Optimize hangs on first run, the embedding model may be downloading. Set <code style="font-size:9px">BOOTK_DISABLE_RAG=1</code> in <code style="font-size:9px">.env</code> to use snippet-only scoring until the model is cached.';
+  }
   document.getElementById('detailP').innerHTML = `
     <div class="empty" style="padding:20px 16px">
       <div class="empty-icon" style="opacity:.45">⚠</div>
       <div style="max-width:380px;line-height:1.55;font-size:12px;color:var(--text-dim)">${escapeHtml(message)}</div>
-      <div style="font-size:10px;color:var(--text-muted);margin-top:14px;line-height:1.45">If this hangs a long time on first run, the embedding model may be downloading. Set <code style="font-size:9px">BOOTK_DISABLE_RAG=1</code> in <code style="font-size:9px">.env</code> to use snippet-only scoring until the model is cached.</div>
+      <div style="font-size:10px;color:var(--text-muted);margin-top:14px;line-height:1.45">${hint}</div>
     </div>`;
 }
 
@@ -1422,10 +1675,13 @@ async function go(){
   } catch(err) {
     console.error(err);
     clearTimeout(abortTimer);
-    let msg = err && err.name === 'AbortError'
+    const isAbort = err && err.name === 'AbortError';
+    const raw = (err && err.message) ? String(err.message) : 'Optimize failed.';
+    let msg = isAbort
       ? 'Request timed out after ' + (OPTIMIZE_FETCH_TIMEOUT_MS / 1000) + 's. The server may still be working (RAG fetches + embeddings). Try again, or set BOOTK_DISABLE_RAG=1 while the embedding model downloads.'
-      : (err && err.message) ? err.message : 'Optimize failed.';
-    showOptimizeFailed(msg);
+      : raw;
+    const hintKind = isAbort ? 'timeout' : (/failed to fetch/i.test(raw) ? 'network' : 'generic');
+    showOptimizeFailed(msg, hintKind);
   }
   finally {
     btn.textContent = '▶ Optimize';
