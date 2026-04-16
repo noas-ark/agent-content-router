@@ -486,14 +486,15 @@
 // ═══════════════════════════════════════════════════════════════
 
 const SCENARIOS = [
-  {tag:"Breaking Finance", q:"What exactly did Powell say this morning about rate cuts?"},
-  {tag:"Earnings",         q:"TSMC just issued a profit warning — what are the specific details?"},
-  {tag:"Market Move",      q:"Why is NVIDIA stock down 8% right now?"},
-  {tag:"M&A",              q:"What did Goldman analysts say about the Microsoft Activision deal today?"},
-  {tag:"Policy",           q:"EU AI Act compliance requirements for foundation model providers"},
-  {tag:"Research",         q:"How does transformer self-attention work?"},
-  {tag:"Medical",          q:"Should I take ozempic for weight loss — what do clinical studies show?"},
-  {tag:"Tech",             q:"What are the benchmark results for the new Gemini Ultra release?"},
+  {tag:"Policy Compare",    q:"Compare the economic impacts of renewable energy policies in Europe vs North America"},
+  {tag:"Macro Outlook",     q:"Compare how top sell-side economists project US vs Eurozone inflation and rate paths over the next 12 months"},
+  {tag:"Semis Deep Dive",   q:"Compare TSMC, Samsung, and Intel foundry margin outlooks using recent analyst notes and management guidance"},
+  {tag:"Energy Markets",    q:"Evaluate competing forecasts for LNG demand and pricing in Europe through 2027 using institutional research"},
+  {tag:"M&A Antitrust",     q:"Assess likely antitrust outcomes for major US-EU tech M&A cases using legal analysis and regulator commentary"},
+  {tag:"AI Regulation",     q:"Compare compliance and cost implications of the EU AI Act vs US state AI laws for foundation model providers"},
+  {tag:"Healthcare HTA",    q:"Compare payer and HTA perspectives on GLP-1 obesity treatments across the US, UK, and Germany"},
+  {tag:"Private Credit",    q:"Analyze default risk outlook in US middle-market private credit from lender reports and rating-agency commentary"},
+  {tag:"Defense Supply",    q:"Assess bottlenecks in NATO defense supply chains using policy papers, contractor disclosures, and specialist reporting"},
 ];
 
 let totalRuns=0, sumSavings=0;
@@ -1008,6 +1009,15 @@ function buildFanoutSplit(res, sigs) {
     const valyuOk = (res.v4 || {}).valyu_configured === true;
     const vyuErr = pb.valyu_error;
     const onlyFree = pb.valyu_only_free_tier === true;
+    const wnaQ = pb.world_news_quote || null;
+    const worldNewsQuoteHtml = wnaQ && wnaQ.eligible
+      ? `<div class="fanout-nores" style="margin-bottom:10px;line-height:1.5;border-left:2px solid rgba(56,139,253,.55);padding:6px 0 6px 10px">
+          <div style="font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:3px">World News API quote (estimate)</div>
+          <div><b>Estimated cost</b> — ${fmt$(Number(wnaQ.estimated_usd || 0))} for this sub-query (${escapeHtml(String(wnaQ.estimated_points || 0))} credits @ ${fmt$(Number(wnaQ.reporter_usd_per_point || 0.003))}/credit).</div>
+          <div style="opacity:.88">Formula anchor: <code style="font-size:9px">1 + 0.01 × results</code> points (typical docs rule). Estimated WNA results in this run: <b>${escapeHtml(String(wnaQ.estimated_results || 0))}</b>.</div>
+          ${wnaQ.api_key_configured === false ? '<div style="color:var(--yellow);opacity:.95">WORLD_NEWS_API_KEY not configured — formula-only estimate.</div>' : ''}
+        </div>`
+      : '';
     let probeHtml = '';
     if (vyuErr) {
       probeHtml =
@@ -1117,8 +1127,9 @@ function buildFanoutSplit(res, sigs) {
       </details>`);
 
     const probeBody =
+      worldNewsQuoteHtml + (
       probeHtml ||
-      '<div class="fanout-nores">No Valyu price-fetch data for this sub-query.</div>';
+      '<div class="fanout-nores">No Valyu price-fetch data for this sub-query.</div>');
     const covForProbe = run.coverage_status === 'gap'
       ? `<div class="hit-cov-badge hit-cov-gap" style="margin-bottom:8px">Free-tier coverage · <b>GAP</b> — best Brave hit is still below the quality floor (Valyu may run to price paid inventory).</div>`
       : `<div class="hit-cov-badge hit-cov-ok" style="margin-bottom:8px">Free-tier coverage · <b>OK</b> — floor met or no probe needed for this sub-query.</div>`;

@@ -1,10 +1,9 @@
 """
-Patterns from the DeepReason / deep_reasoning_researcher project: planner + critic only.
+Patterns from the DeepReason / deep_reasoning_researcher project: planner + critic (+ writer in app).
 
-We use the *planner* idea (break the user question into targeted web search strings) and the
-*critic* idea (judge whether gathered snippets look sufficient vs. needing more search).
-
-No LangGraph loop, Tavily, researcher node, or writer — see upstream:
+We use the *planner* idea (targeted web search strings), the *critic* idea (sufficiency vs. gaps),
+and in ``app.py`` the *writer* step uses the same prompts and research-data shape as upstream
+``nodes.writer_node`` / ``researcher_node`` (without LangGraph or Tavily). See:
 https://github.com/themiccc/deep_reasoning_researcher
 """
 

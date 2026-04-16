@@ -38,6 +38,9 @@ MAX_VALYU_PROBES_PER_REQUEST = max(1, int(os.environ.get("MAX_VALYU_PROBES_PER_R
 MAX_REFANOUT_ROUNDS = max(1, int(os.environ.get("MAX_REFANOUT_ROUNDS", "2")))
 # Brave Web Search API allows up to 20 results per request; was previously hard-coded to 5.
 BRAVE_WEB_RESULT_COUNT = max(1, min(20, int(os.environ.get("BRAVE_WEB_RESULT_COUNT", "20"))))
+WORLD_NEWS_REPORTER_OVERAGE_PER_POINT_USD = float(
+    os.environ.get("WORLD_NEWS_REPORTER_OVERAGE_PER_POINT_USD", "0.003")
+)
 COVERAGE_GAP_POLICY = (
     "A sub-query is in 'gap' when the highest free-hit relevance score is below that "
     "sub-query's quality floor (from signals). Relevance = max(RAG max-chunk similarity, "
@@ -954,6 +957,49 @@ def _build_research_digest(sub_query_runs: list) -> str:
     return "\n".join(parts)
 
 
+def _build_deepreason_writer_research_data(
+    sub_query_runs: list,
+    *,
+    results_per_query: int = 3,
+    content_max: int = 500,
+    max_total_chars: int = 28000,
+) -> str:
+    """
+    Mirror deep_reasoning_researcher ``researcher_node`` string format so ``writer_node``-style
+    prompts apply 1:1: each sub-query is a ``=== SEARCH QUERY i: q ===`` block with up to
+    ``results_per_query`` hits, each with Title / URL / Content (snippet truncated like Tavily content).
+    """
+    chunks: list[str] = []
+    for run in sub_query_runs:
+        if not isinstance(run, dict):
+            continue
+        idx = run.get("index", "?")
+        q = run.get("query") or ""
+        block_lines: list[str] = [f"\n=== SEARCH QUERY {idx}: {q} ===\n"]
+        fr = [r for r in (run.get("free_results") or []) if isinstance(r, dict)]
+        fr.sort(key=lambda r: float(r.get("coverage_score") or 0), reverse=True)
+        picked = fr[:results_per_query]
+        if not picked:
+            block_lines.append("No results found.\n")
+        else:
+            for r in picked:
+                title = _text_field(r.get("title"), 500) or "N/A"
+                url = str(r.get("url") or "").strip() or "N/A"
+                raw_snip = _text_field(r.get("snippet"), None) or ""
+                if not raw_snip:
+                    content_body = "N/A"
+                else:
+                    content_body = raw_snip[:content_max] + ("..." if len(raw_snip) > content_max else "")
+                block_lines.append(f"\nTitle: {title}\n")
+                block_lines.append(f"URL: {url}\n")
+                block_lines.append(f"Content: {content_body}\n")
+        chunks.append("".join(block_lines))
+    out = "\n".join(chunks).strip()
+    if len(out) > max_total_chars:
+        out = out[: max_total_chars - 20].rstrip() + "\n...[truncated]"
+    return out
+
+
 def _text_field(val, max_len: int | None = None) -> str:
     """Coerce search/API fields to plain str for JSON/UI. Prevents odd types (e.g. slice) from appearing as text."""
     if val is None:
@@ -1074,6 +1120,141 @@ def _brave_search(query: str, count=None):
         return []
 
 
+def _world_news_api_key_present() -> bool:
+    return bool(_env_first("WORLD_NEWS_API_KEY", "WORLDNEWS_API_KEY"))
+
+
+def _wna_category(signals: dict) -> str | None:
+    """Map internal domain/intent to a World News API category string."""
+    domain = signals.get("domain", "")
+    intent = signals.get("intent", "")
+    mapping = {
+        "financial": "business",
+        "medical": "health",
+        "legal": "politics",
+    }
+    if domain in mapping:
+        return mapping[domain]
+    if intent == "breaking_news":
+        return None  # Don't restrict by category for breaking news — cast wide
+    return None
+
+
+def _search_world_news_api(query: str, signals: dict | None = None, count: int = 10) -> list[dict]:
+    """
+    Search World News API (worldnewsapi.com) and return results in the same
+    {title, url, snippet, source, date} shape used by _brave_search().
+    Costs 1 point per call against your subscription quota.
+
+    Uses signals to pass entity filters and category hints when available.
+    Auth: api-key as query param (required) + x-api-key header.
+    """
+    key = _env_first("WORLD_NEWS_API_KEY", "WORLDNEWS_API_KEY")
+    if not key:
+        return []
+
+    params: dict = {
+        "api-key": key,
+        "text": query[:200],
+        "language": "en",
+        "number": min(count, 100),
+        "sort": "publish-time",
+        "sort-direction": "DESC",
+    }
+
+    if signals:
+        category = _wna_category(signals)
+        if category:
+            params["categories"] = category
+
+    def _do_request(p: dict) -> list:
+        api_url = "https://api.worldnewsapi.com/search-news?" + urllib.parse.urlencode(p)
+        req = urllib.request.Request(
+            api_url,
+            headers={
+                "x-api-key": key,
+                "User-Agent": "bootk-ai-router/4.0",
+                "Accept": "application/json",
+            },
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            payload = _json.loads(resp.read().decode())
+        return payload.get("news") or []
+
+    def _parse_articles(articles: list) -> list[dict]:
+        out = []
+        for a in articles[:count]:
+            title = _text_field(a.get("title"), 800)
+            snippet = _text_field(a.get("text") or a.get("summary"), 8000)
+            article_url = _text_field(a.get("url"), 4000)
+            if not article_url or not title:
+                continue
+            source = _text_field(_host_from_url(article_url) or a.get("source_country"), 300)
+            out.append({
+                "title": title,
+                "url": article_url,
+                "snippet": snippet,
+                "source": source,
+                "date": a.get("publish_date"),
+                "authors": a.get("authors") or [],
+                "category": a.get("category"),
+                "sentiment": a.get("sentiment"),
+                "_provider": "world_news_api",
+            })
+        return out
+
+    try:
+        articles = _do_request(params)
+        logger.debug("world_news_api %r → %d articles", query[:60], len(articles))
+        return _parse_articles(articles)
+    except Exception as e:
+        logger.warning("world_news_api search failed for %r: %s", query[:60], e)
+        return []
+
+
+def _is_news_like_query(signals: dict) -> bool:
+    intent = str(signals.get("intent") or "")
+    content_type = str(signals.get("content_type_needed") or "")
+    return (
+        intent == "breaking_news"
+        or content_type == "news_article"
+        or bool(signals.get("requires_freshness"))
+    )
+
+
+def _estimate_world_news_quote(signals: dict, free_results_for_query: list[dict]) -> dict:
+    """
+    Estimate World News API query cost in dollars (Reporter-tier overage anchor).
+    World News docs: usually around 1 point/request + 0.01 per returned result.
+    """
+    key_ok = _world_news_api_key_present()
+    if not _is_news_like_query(signals):
+        return {
+            "eligible": False,
+            "reason": "not_news_like_query",
+            "estimated_points": 0.0,
+            "estimated_usd": 0.0,
+            "reporter_usd_per_point": WORLD_NEWS_REPORTER_OVERAGE_PER_POINT_USD,
+            "estimated_results": 0,
+            "api_key_configured": key_ok,
+        }
+    wna_hits = sum(
+        1 for r in (free_results_for_query or []) if (isinstance(r, dict) and r.get("_provider") == "world_news_api")
+    )
+    est_points = round(1.0 + 0.01 * max(0, int(wna_hits)), 4)
+    est_usd = round(est_points * WORLD_NEWS_REPORTER_OVERAGE_PER_POINT_USD, 6)
+    return {
+        "eligible": True,
+        "reason": None,
+        "estimated_points": est_points,
+        "estimated_usd": est_usd,
+        "reporter_usd_per_point": WORLD_NEWS_REPORTER_OVERAGE_PER_POINT_USD,
+        "estimated_results": int(wna_hits),
+        "formula": "1 point/request + 0.01 point/result (typical) × Reporter overage $/point",
+        "api_key_configured": key_ok,
+    }
+
+
 def _snippet_coverage_score(result: dict, signals: dict) -> float:
     """Heuristic score from title + snippet only (fallback when RAG fetch unavailable)."""
     text = f"{_text_field(result.get('title'))} {_text_field(result.get('snippet'))}".lower()
@@ -1081,8 +1262,14 @@ def _snippet_coverage_score(result: dict, signals: dict) -> float:
     entity_cov = (sum(1 for e in entities if str(e).lower() in text) / len(entities)) if entities else 0.5
     keyword_hits = signals.get("keyword_hits") or []
     keyword_score = (sum(1 for k in keyword_hits if k.lower() in text) / max(len(keyword_hits), 1))
-    temporal = 0.85 if signals.get("requires_freshness") and result.get("date") else 0.7
-    return round(entity_cov * 0.4 + temporal * 0.25 + keyword_score * 0.2 + 0.15, 3)
+    # WNA articles always have a real publish_date from a curated news source — treat as high-quality
+    # regardless of whether the query explicitly requires freshness.
+    is_wna = result.get("_provider") == "world_news_api"
+    has_date = bool(result.get("date"))
+    temporal = 0.92 if is_wna and has_date else (0.85 if has_date else 0.7)
+    # Provenance bonus: WNA is an editorially curated corpus, not random web crawl
+    provenance = 0.08 if is_wna else 0.0
+    return round(min(1.0, entity_cov * 0.38 + temporal * 0.24 + keyword_score * 0.19 + 0.14 + provenance), 3)
 
 
 def _to_cpm(per_doc_usd: float) -> int:
@@ -1139,6 +1326,7 @@ def _empty_probe_record(sub_query: str, *, skipped_reason: str, attempted: bool)
         "results": [],
         "skipped_reason": skipped_reason,
         "attempted": attempted,
+        "world_news_quote": None,
     }
 
 
@@ -1153,6 +1341,7 @@ def _probe_valyu(sub_query: str, signals: dict) -> dict:
             "results": [],
             "skipped_reason": None,
             "attempted": True,
+            "world_news_quote": None,
         }
     try:
         from valyu import Valyu  # type: ignore
@@ -1165,6 +1354,7 @@ def _probe_valyu(sub_query: str, signals: dict) -> dict:
             "results": [],
             "skipped_reason": None,
             "attempted": True,
+            "world_news_quote": None,
         }
     valyu = Valyu(api_key=key)
     raw_ceiling = signals.get("max_price_usd", 0) or 0
@@ -1201,6 +1391,7 @@ def _probe_valyu(sub_query: str, signals: dict) -> dict:
             "skipped_reason": None,
             "attempted": True,
             "valyu_error": err_note,
+            "world_news_quote": None,
         }
 
     free_urls = {getattr(r, "url", "") for r in free_results}
@@ -1252,6 +1443,7 @@ def _probe_valyu(sub_query: str, signals: dict) -> dict:
         "attempted": True,
         "valyu_only_free_tier": only_free_fallback,
         "valyu_proprietary_cpm_used": cpm_for_proprietary,
+        "world_news_quote": None,
     }
 
 
@@ -1337,6 +1529,20 @@ def _run_fanout_round(
                 }
                 for r in fallback
             ]
+        # For news-like queries, augment free search with World News API.
+        if _is_news_like_query(signals) and _world_news_api_key_present() and time.time() <= deadline:
+            wna_results = _search_world_news_api(sq_query, signals=signals, count=10)
+            logger.info("WNA %r → %d results", sq_query[:60], len(wna_results))
+            if wna_results:
+                seen_urls = {r.get("url", "") for r in free}
+                added = 0
+                for r in wna_results:
+                    if r.get("url", "") not in seen_urls:
+                        free.append(r)
+                        seen_urls.add(r["url"])
+                        added += 1
+                logger.info("WNA merged %d new articles for %r", added, sq_query[:60])
+                provider_used = f"{provider_used}+WorldNewsAPI"
         search_providers[sq_query] = provider_used
         for r in free:
             r["snippet_score"] = _snippet_coverage_score(r, signals)
@@ -1361,6 +1567,7 @@ def _run_fanout_round(
             probe_results[sq_query] = _empty_probe_record(
                 sq_query, skipped_reason="probe_budget_exhausted", attempted=False
             )
+        probe_results[sq_query]["world_news_quote"] = _estimate_world_news_quote(signals, free)
 
     return sq_with_signals, free_results, probe_results, search_providers, valyu_probes_used
 
@@ -1451,80 +1658,79 @@ def _build_sub_query_runs(
                     "valyu_error": pr.get("valyu_error"),
                     "valyu_only_free_tier": pr.get("valyu_only_free_tier"),
                     "valyu_proprietary_cpm_used": pr.get("valyu_proprietary_cpm_used"),
+                    "world_news_quote": pr.get("world_news_quote"),
                 },
             }
         )
     return sub_query_runs
 
 
-def _synthesize_research_answer(
-    query: str,
-    digest: str,
-    rc: dict,
-    free_plan_n: int,
-    paid_plan_n: int,
-    total_bid: float,
-    client,
-) -> dict:
+def _synthesize_research_answer(query: str, combined_research_data: str, client) -> dict:
     """
-    Writer-node style answer from the same digest the critic sees (deep_reasoning_researcher
-    flow: retrieve → critic → writer). Stub when no LLM.
+    ``writer_node`` from deep_reasoning_researcher (verbatim prompt + gpt-4o-mini @ 0.7).
+    ``combined_research_data`` must match ``researcher_node`` output shape (SEARCH QUERY blocks).
     """
     stub = {
         "mode": "stub",
         "text": (
-            "This step corresponds to the **Writer** node in "
+            "This step mirrors **writer_node** in "
             "[deep_reasoning_researcher](https://github.com/themiccc/deep_reasoning_researcher): "
-            "after search and the critic, the pipeline would synthesize a full answer from gathered evidence. "
-            "Configure an OpenAI API key for Instructor to generate that answer here from your snippets."
+            "a final markdown report from accumulated search blocks. "
+            "Configure an OpenAI API key for Instructor to run it here."
         ),
-        "summary_line": "Writer step — configure LLM for synthesized answer.",
+        "summary_line": "Writer step — configure LLM (DeepReason writer_node).",
     }
     if client is None:
         return stub
-    if not (digest or "").strip():
-        return {**stub, "text": stub["text"] + " (Empty digest — nothing to synthesize.)"}
+    if not (combined_research_data or "").strip():
+        return {**stub, "text": stub["text"] + " (No research blocks — nothing to synthesize.)"}
     try:
         from pydantic import BaseModel, Field
 
         class ResearchWriterOutput(BaseModel):
-            """Instructor requires response_model on patched OpenAI clients."""
+            """Matches AgentState['final_report']; Instructor requires response_model."""
 
-            answer: str = Field(
+            final_report: str = Field(
                 description=(
-                    "Several short paragraphs answering the user question using only the evidence; "
-                    "say when information is missing; no invented URLs, quotes, or numbers."
+                    "Comprehensive professional markdown report: structured with headings and bullets, "
+                    "summary and key findings, citations to the provided sources, actionable insights, "
+                    "and limitations or gaps."
                 )
             )
 
-        pct = rc.get("completeness_percent")
-        need = rc.get("need_more_information")
-        prompt = (
-            f"User question:\n{query.strip()}\n\n"
-            f"Evidence (web search titles/snippets only):\n{digest[:12000]}\n\n"
-            f"Completeness context: ~{pct}% · need_more_information={need} · "
-            f"free hits in plan: {free_plan_n} · paid line items: {paid_plan_n} · total bid ${total_bid:.4f}\n\n"
-            "Write a clear answer (several short paragraphs). Ground claims in the evidence above; "
-            "if something is not in the snippets, say so. Do not invent URLs, quotes, or numbers not implied by the text."
-        )
+        # Same template as themiccc/deep_reasoning_researcher nodes.py writer_node (user message only).
+        writer_prompt = f"""
+You are an expert research analyst. Based on the accumulated research data below,
+write a comprehensive, professional report that fully answers the user's original query.
+
+Original Query: {query.strip()}
+
+Research Data:
+{combined_research_data}
+
+REQUIREMENTS:
+1. Write a well-structured, professional report
+2. Include proper citations and references to sources
+3. Provide clear, actionable insights
+4. Use markdown formatting for readability
+5. Include a summary and key findings
+6. Acknowledge any limitations or gaps in the research
+7. Structure with headings, bullet points, and clear organization
+
+The report should be comprehensive yet concise, focusing on the most relevant information.
+"""
         out = client.chat.completions.create(
             model="gpt-4o-mini",
             response_model=ResearchWriterOutput,
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are the Writer in a research pipeline. Answer only from the user's evidence block.",
-                },
-                {"role": "user", "content": prompt},
-            ],
-            temperature=0.25,
-            timeout=45,
+            messages=[{"role": "user", "content": writer_prompt}],
+            temperature=0.7,
+            timeout=120,
         )
-        text = (out.answer or "").strip()
+        text = (out.final_report or "").strip()
         return {
             "mode": "llm",
             "text": text,
-            "summary_line": "Writer: answer drafted from search digest.",
+            "summary_line": "Writer: final report (deep_reasoning_researcher writer_node).",
         }
     except Exception as ex:
         logger.warning("synthesis failed: %s", ex)
@@ -1738,15 +1944,8 @@ def optimize(query, customer_id="default"):
         },
     )
 
-    synthesis = _synthesize_research_answer(
-        query,
-        digest,
-        research_completeness,
-        len(free_plan),
-        len(paid_plan),
-        float(total_bid),
-        _instructor_client(),
-    )
+    writer_research_data = _build_deepreason_writer_research_data(sub_query_runs)
+    synthesis = _synthesize_research_answer(query, writer_research_data, _instructor_client())
 
     # Visualizable pipeline log (timestamps are synthetic spacing for readability)
     _tick = [0]
