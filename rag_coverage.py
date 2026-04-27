@@ -214,13 +214,16 @@ def enrich_free_results_with_rag(
                 r["rag_status"] = "not_fetched"
             continue
         fr = fetched[i]
+        r["rag_words_fetched"] = fr.get("n_words", 0)
         if not fr.get("ok"):
             r["rag_status"] = f"fetch_failed:{fr.get('reason', 'unknown')}"
+            r["rag_fetch_error"] = fr.get("reason", "unknown")
             continue
         if fr.get("n_words", 0) < MIN_WORDS_FOR_RAG:
             r["rag_status"] = "fetch_short"
             continue
         chs = chunk_text(fr.get("text") or "")
+        r["rag_chunks_count"] = len(chs)
         if not chs:
             r["rag_status"] = "no_chunks"
             continue

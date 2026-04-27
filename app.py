@@ -1,4 +1,5 @@
 import logging
+logging.basicConfig(level=logging.INFO)
 import math
 import os
 import random
@@ -31,16 +32,13 @@ from deep_research_tasks import (
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-MAX_OPTIMIZE_SECONDS = float(os.environ.get("MAX_OPTIMIZE_SECONDS", "30"))
+MAX_OPTIMIZE_SECONDS = float(os.environ.get("MAX_OPTIMIZE_SECONDS", "90"))
 # One Valyu tier-diff probe per gap by default (up to this many per /optimize).
 MAX_VALYU_PROBES_PER_REQUEST = max(1, int(os.environ.get("MAX_VALYU_PROBES_PER_REQUEST", "5")))
 # Max total fanout rounds (1 = no re-fanout; 2 = one follow-up round if critic says need_more).
 MAX_REFANOUT_ROUNDS = max(1, int(os.environ.get("MAX_REFANOUT_ROUNDS", "2")))
 # Brave Web Search API allows up to 20 results per request; was previously hard-coded to 5.
 BRAVE_WEB_RESULT_COUNT = max(1, min(20, int(os.environ.get("BRAVE_WEB_RESULT_COUNT", "20"))))
-WORLD_NEWS_REPORTER_OVERAGE_PER_POINT_USD = float(
-    os.environ.get("WORLD_NEWS_REPORTER_OVERAGE_PER_POINT_USD", "0.003")
-)
 COVERAGE_GAP_POLICY = (
     "A sub-query is in 'gap' when the highest free-hit relevance score is below that "
     "sub-query's quality floor (from signals). Relevance = max(RAG max-chunk similarity, "
@@ -524,7 +522,7 @@ def extract_signals(query):
     depth_composed = min(0.40*complexity_raw + 0.32*depth_required + 0.18*question_type_score + 0.10*ambiguity_raw, 0.99)
 
     # ── Derived thresholds ────────────────────────────────────
-    quality_threshold = min(0.60 + credibility_composed*0.30 + depth_composed*0.08, 0.96)
+    quality_threshold = min(0.85 + credibility_composed*0.06 + depth_composed*0.04, 0.96)
     min_sources = 2 if corroboration_raw > 0.60 else 1
 
     # ── Facebook-paper style: Query Understanding Stack (Fig 3) ──
@@ -745,7 +743,7 @@ def _routing_confidence(keyword_hits, domain, intent) -> float:
     return min(conf, 1.0)
 
 
-def compute_bid_ceiling(sigs: dict) -> float:
+def compute_bid_ceiling(sigs: dict, best_free: float | None = None) -> float:
     base = INTENT_BASE.get(sigs.get("intent"), 0.25)
     if sigs.get("domain") == "medical" and sigs.get("quality_threshold", 0) >= 0.85:
         base = max(base, 0.75)
@@ -754,6 +752,11 @@ def compute_bid_ceiling(sigs: dict) -> float:
     multiplier = 0.6 + sigs.get("complexity_score", 0.5) * 0.4
     if sigs.get("quality_threshold", 0.7) < 0.7:
         multiplier *= 0.5
+    # Scale ceiling by how large the coverage gap is: a tiny gap warrants a lower ceiling.
+    if best_free is not None:
+        gap = max(0.0, sigs.get("quality_threshold", 0.7) - best_free)
+        gap_scale = min(1.0, gap / max(sigs.get("quality_threshold", 0.7), 0.01))
+        multiplier *= 0.3 + 0.7 * gap_scale
     return round(min(base * multiplier, 2.0), 4)
 
 
@@ -790,7 +793,7 @@ def _infer_signals_local(query: str, goal: str) -> dict:
         domain = "general"
     complexity_score = min(1.0, (len(query.split()) + len(goal.split())) / 28)
     requires_freshness = "news" in keyword_hits
-    quality_threshold = 0.9 if intent in ("prior_art", "regulatory") else (0.82 if intent in ("analysis", "breaking_news") else 0.65)
+    quality_threshold = 0.9 if intent in ("prior_art", "regulatory") else (0.85 if intent in ("analysis", "breaking_news") else 0.85)
     content_type_needed = (
         "news_article" if intent == "breaking_news"
         else "regulatory_doc" if intent == "regulatory"
@@ -814,13 +817,6 @@ def _infer_signals_local(query: str, goal: str) -> dict:
         "keyword_hits": keyword_hits,
         "routing_confidence": round(_routing_confidence(keyword_hits, domain, intent), 3),
         "valyu_sources": [],
-    }
-    signals["max_price_usd"] = compute_bid_ceiling(signals)
-    signals["price_derivation"] = {
-        "intent_base": INTENT_BASE.get(intent, 0.25),
-        "complexity_multiplier": round(0.6 + complexity_score * 0.4, 3),
-        "quality_threshold": signals["quality_threshold"],
-        "max_price_usd": signals["max_price_usd"],
     }
     return signals
 
@@ -1069,19 +1065,36 @@ def _infer_signals(query: str, goal: str) -> dict:
             "intent_template": model_out.intent_template,
             "requires_freshness": bool(model_out.requires_freshness),
             "content_type_needed": model_out.content_type_needed,
-            "quality_threshold": max(0.0, min(1.0, float(model_out.quality_threshold))),
-        }
-        signals["max_price_usd"] = compute_bid_ceiling(signals)
-        signals["price_derivation"] = {
-            "intent_base": INTENT_BASE.get(signals["intent"], 0.25),
-            "complexity_multiplier": round(0.6 + signals.get("complexity_score", 0.5) * 0.4, 3),
-            "quality_threshold": signals["quality_threshold"],
-            "max_price_usd": signals["max_price_usd"],
-            "source": "instructor+local-derivation",
+            "quality_threshold": max(0.85, min(1.0, float(model_out.quality_threshold))),
         }
         return signals
     except Exception:
         return local
+
+
+def _filter_homepage_results(results: list) -> list:
+    """Drop root-domain and near-root URLs (homepages, section indexes) from search results."""
+    import urllib.parse as _up
+    out = []
+    for r in results:
+        url = (r.get("url") or "").strip()
+        try:
+            parsed = _up.urlparse(url)
+            path = parsed.path.rstrip("/")
+            # Skip if path is empty, just a single slash, or a shallow section page with no slug
+            # e.g. bloomberg.com, youtube.com, pitchbook.com/news
+            parts = [p for p in path.split("/") if p]
+            if len(parts) == 0:
+                continue  # pure homepage
+            if len(parts) == 1 and parts[0] in (
+                "news", "articles", "blog", "search", "topics", "en", "us", "home",
+                "index", "latest", "markets", "business", "technology", "politics",
+            ):
+                continue  # section index page, not an article
+        except Exception:
+            pass
+        out.append(r)
+    return out
 
 
 def _brave_search(query: str, count=None):
@@ -1120,95 +1133,64 @@ def _brave_search(query: str, count=None):
         return []
 
 
-def _world_news_api_key_present() -> bool:
-    return bool(_env_first("WORLD_NEWS_API_KEY", "WORLDNEWS_API_KEY"))
+def _brave_news_available() -> bool:
+    return bool(_env_first("DSAIL_BRAVE_API_KEY", "BRAVE_API_KEY"))
 
 
-def _wna_category(signals: dict) -> str | None:
-    """Map internal domain/intent to a World News API category string."""
-    domain = signals.get("domain", "")
-    intent = signals.get("intent", "")
-    mapping = {
-        "financial": "business",
-        "medical": "health",
-        "legal": "politics",
-    }
-    if domain in mapping:
-        return mapping[domain]
-    if intent == "breaking_news":
-        return None  # Don't restrict by category for breaking news — cast wide
-    return None
-
-
-def _search_world_news_api(query: str, signals: dict | None = None, count: int = 10) -> list[dict]:
+def _brave_news_search(query: str, signals: dict | None = None, count: int = 10) -> list[dict]:
     """
-    Search World News API (worldnewsapi.com) and return results in the same
-    {title, url, snippet, source, date} shape used by _brave_search().
-    Costs 1 point per call against your subscription quota.
-
-    Uses signals to pass entity filters and category hints when available.
-    Auth: api-key as query param (required) + x-api-key header.
+    Search Brave News endpoint (/res/v1/news/search) — included in the Brave subscription,
+    no additional cost. Returns results in the same {title, url, snippet, source, date} shape.
     """
-    key = _env_first("WORLD_NEWS_API_KEY", "WORLDNEWS_API_KEY")
+    key = _env_first("DSAIL_BRAVE_API_KEY", "BRAVE_API_KEY")
     if not key:
         return []
 
-    params: dict = {
-        "api-key": key,
-        "text": query[:200],
-        "language": "en",
-        "number": min(count, 100),
-        "sort": "publish-time",
-        "sort-direction": "DESC",
-    }
-
+    freshness = None
     if signals:
-        category = _wna_category(signals)
-        if category:
-            params["categories"] = category
+        velocity = signals.get("velocity") or 0
+        if velocity >= 0.9:
+            freshness = "pd"   # past day
+        elif signals.get("requires_freshness"):
+            freshness = "pw"   # past week
 
-    def _do_request(p: dict) -> list:
-        api_url = "https://api.worldnewsapi.com/search-news?" + urllib.parse.urlencode(p)
-        req = urllib.request.Request(
-            api_url,
-            headers={
-                "x-api-key": key,
-                "User-Agent": "bootk-ai-router/4.0",
-                "Accept": "application/json",
-            },
-        )
-        with urllib.request.urlopen(req, timeout=10) as resp:
+    params: dict = {"q": query[:200], "count": min(count, 20), "search_lang": "en"}
+    if freshness:
+        params["freshness"] = freshness
+
+    url = "https://api.search.brave.com/res/v1/news/search?" + urllib.parse.urlencode(params)
+    req = urllib.request.Request(
+        url,
+        headers={
+            "Accept": "application/json",
+            "X-Subscription-Token": key,
+            "User-Agent": "bootk-ai-router/4.0",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=12) as resp:
             payload = _json.loads(resp.read().decode())
-        return payload.get("news") or []
-
-    def _parse_articles(articles: list) -> list[dict]:
+        results = payload.get("results") or []
         out = []
-        for a in articles[:count]:
-            title = _text_field(a.get("title"), 800)
-            snippet = _text_field(a.get("text") or a.get("summary"), 8000)
-            article_url = _text_field(a.get("url"), 4000)
+        for r in results[:count]:
+            title = _text_field(r.get("title"), 800)
+            article_url = _text_field(r.get("url"), 4000)
             if not article_url or not title:
                 continue
-            source = _text_field(_host_from_url(article_url) or a.get("source_country"), 300)
+            source_obj = r.get("source") or {}
+            source = _text_field(source_obj.get("name") or _host_from_url(article_url), 300)
             out.append({
                 "title": title,
                 "url": article_url,
-                "snippet": snippet,
+                "snippet": _text_field(r.get("description"), 8000),
                 "source": source,
-                "date": a.get("publish_date"),
-                "authors": a.get("authors") or [],
-                "category": a.get("category"),
-                "sentiment": a.get("sentiment"),
-                "_provider": "world_news_api",
+                "date": r.get("age") or r.get("page_age"),
+                "_provider": "brave_news",
             })
+        logger.info("brave_news %r → %d results", query[:60], len(out))
         return out
-
-    try:
-        articles = _do_request(params)
-        logger.debug("world_news_api %r → %d articles", query[:60], len(articles))
-        return _parse_articles(articles)
     except Exception as e:
-        logger.warning("world_news_api search failed for %r: %s", query[:60], e)
+        logger.warning("brave_news search failed for %r: %s", query[:60], e)
         return []
 
 
@@ -1222,36 +1204,20 @@ def _is_news_like_query(signals: dict) -> bool:
     )
 
 
-def _estimate_world_news_quote(signals: dict, free_results_for_query: list[dict]) -> dict:
-    """
-    Estimate World News API query cost in dollars (Reporter-tier overage anchor).
-    World News docs: usually around 1 point/request + 0.01 per returned result.
-    """
-    key_ok = _world_news_api_key_present()
-    if not _is_news_like_query(signals):
-        return {
-            "eligible": False,
-            "reason": "not_news_like_query",
-            "estimated_points": 0.0,
-            "estimated_usd": 0.0,
-            "reporter_usd_per_point": WORLD_NEWS_REPORTER_OVERAGE_PER_POINT_USD,
-            "estimated_results": 0,
-            "api_key_configured": key_ok,
-        }
-    wna_hits = sum(
-        1 for r in (free_results_for_query or []) if (isinstance(r, dict) and r.get("_provider") == "world_news_api")
+def _estimate_brave_news_quote(signals: dict, free_results_for_query: list[dict]) -> dict:
+    """Brave News is included in the Brave subscription — no additional per-query cost."""
+    key_ok = _brave_news_available()
+    news_hits = sum(
+        1 for r in (free_results_for_query or []) if (isinstance(r, dict) and r.get("_provider") == "brave_news")
     )
-    est_points = round(1.0 + 0.01 * max(0, int(wna_hits)), 4)
-    est_usd = round(est_points * WORLD_NEWS_REPORTER_OVERAGE_PER_POINT_USD, 6)
+    eligible = _is_news_like_query(signals)
     return {
-        "eligible": True,
-        "reason": None,
-        "estimated_points": est_points,
-        "estimated_usd": est_usd,
-        "reporter_usd_per_point": WORLD_NEWS_REPORTER_OVERAGE_PER_POINT_USD,
-        "estimated_results": int(wna_hits),
-        "formula": "1 point/request + 0.01 point/result (typical) × Reporter overage $/point",
+        "eligible": eligible,
+        "reason": None if eligible else "not_news_like_query",
+        "estimated_usd": 0.0,
+        "estimated_results": int(news_hits),
         "api_key_configured": key_ok,
+        "formula": "Included in Brave Search subscription — $0 marginal cost",
     }
 
 
@@ -1262,13 +1228,10 @@ def _snippet_coverage_score(result: dict, signals: dict) -> float:
     entity_cov = (sum(1 for e in entities if str(e).lower() in text) / len(entities)) if entities else 0.5
     keyword_hits = signals.get("keyword_hits") or []
     keyword_score = (sum(1 for k in keyword_hits if k.lower() in text) / max(len(keyword_hits), 1))
-    # WNA articles always have a real publish_date from a curated news source — treat as high-quality
-    # regardless of whether the query explicitly requires freshness.
-    is_wna = result.get("_provider") == "world_news_api"
+    is_news = result.get("_provider") == "brave_news"
     has_date = bool(result.get("date"))
-    temporal = 0.92 if is_wna and has_date else (0.85 if has_date else 0.7)
-    # Provenance bonus: WNA is an editorially curated corpus, not random web crawl
-    provenance = 0.08 if is_wna else 0.0
+    temporal = 0.92 if is_news and has_date else (0.85 if has_date else 0.7)
+    provenance = 0.08 if is_news else 0.0
     return round(min(1.0, entity_cov * 0.38 + temporal * 0.24 + keyword_score * 0.19 + 0.14 + provenance), 3)
 
 
@@ -1317,6 +1280,95 @@ def _valyu_api_key_present() -> bool:
     return bool(_env_first("DSAIL_VALYU_API_KEY", "VALYU_API_KEY"))
 
 
+# Exa pricing (March 2026): $7/1k searches, full text included for first 10 results.
+# Additional results beyond 10: +$1/1k per extra result.
+EXA_SEARCH_COST_USD = 0.007        # per search call (includes text for up to 10 results)
+EXA_EXTRA_RESULT_COST_USD = 0.001  # per result beyond the first 10
+EXA_DEFAULT_RESULTS = 10           # fetch up to 10 — all included in base price
+
+
+def _exa_available() -> bool:
+    return bool(os.environ.get("EXA_API_KEY", "").strip())
+
+
+def _exa_price_estimate(n_results: int = EXA_DEFAULT_RESULTS) -> dict:
+    extra = max(0, n_results - 10)
+    total = round(EXA_SEARCH_COST_USD + extra * EXA_EXTRA_RESULT_COST_USD, 4)
+    formula = f"${EXA_SEARCH_COST_USD} flat · {min(n_results, 10)} full-text results"
+    if extra:
+        formula += f" + {extra} × ${EXA_EXTRA_RESULT_COST_USD} extra results"
+    return {
+        "search_cost_usd": EXA_SEARCH_COST_USD,
+        "n_results": n_results,
+        "total_usd": total,
+        "formula": formula,
+    }
+
+
+def _exa_fetch(sub_query: str, signals: dict, n_results: int = 5) -> dict:
+    """Execute the actual Exa search + content fetch. Called on demand via /fetch-exa."""
+    key = os.environ.get("EXA_API_KEY", "").strip()
+    if not key:
+        return {"error": "EXA_API_KEY not configured", "results": []}
+
+    is_news = _is_news_like_query(signals)
+    body: dict = {
+        "query": sub_query,
+        "type": "neural",
+        "numResults": n_results,
+        "contents": {"text": {"maxCharacters": 2000}},
+    }
+    if is_news:
+        body["category"] = "news"
+        body["recencyDays"] = 30
+
+    try:
+        req_data = _json.dumps(body).encode()
+        req = urllib.request.Request(
+            "https://api.exa.ai/search",
+            data=req_data,
+            headers={
+                "x-api-key": key,
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "User-Agent": "bootk-ai-router/4.0",
+            },
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            payload = _json.loads(resp.read().decode())
+
+        results = payload.get("results") or []
+        out = []
+        for r in results:
+            url = _text_field(r.get("url"), 4000)
+            title = _text_field(r.get("title"), 800)
+            if not url:
+                continue
+            text = r.get("text") or ""
+            snippet = _text_field(text[:500] if text else r.get("summary", ""), 500)
+            out.append({
+                "title": title,
+                "url": url,
+                "snippet": snippet,
+                "source": _text_field(_host_from_url(url), 300),
+                "date": r.get("publishedDate"),
+            })
+        logger.info("exa fetch | query=%r | n=%d", sub_query[:60], len(out))
+        return {"error": None, "results": out, "cost_usd": _exa_price_estimate(n_results)["total_usd"]}
+    except Exception as e:
+        logger.warning("exa fetch exception | query=%r | error=%s", sub_query[:60], e)
+        return {"error": str(e)[:220], "results": []}
+
+
+def _probe_exa(sub_query: str, signals: dict, n_results: int = 5) -> dict:
+    """Return estimate only — actual fetch is triggered on demand via /fetch-exa."""
+    return {
+        **_empty_probe_record(sub_query, skipped_reason=None, attempted=False),
+        "exa_quote": _exa_price_estimate(n_results),
+    }
+
+
 def _empty_probe_record(sub_query: str, *, skipped_reason: str, attempted: bool) -> dict:
     return {
         "sub_query": sub_query,
@@ -1326,13 +1378,17 @@ def _empty_probe_record(sub_query: str, *, skipped_reason: str, attempted: bool)
         "results": [],
         "skipped_reason": skipped_reason,
         "attempted": attempted,
+        "exa_error": None,
+        "exa_quote": None,
         "world_news_quote": None,
     }
 
 
 def _probe_valyu(sub_query: str, signals: dict) -> dict:
     key = _env_first("DSAIL_VALYU_API_KEY", "VALYU_API_KEY")
+    logger.info("_probe_valyu called | query=%r | key_present=%s", sub_query[:60], bool(key))
     if not key:
+        logger.warning("_probe_valyu: no Valyu API key found — skipping probe")
         return {
             "sub_query": sub_query,
             "free_count": 0,
@@ -1345,7 +1401,8 @@ def _probe_valyu(sub_query: str, signals: dict) -> dict:
         }
     try:
         from valyu import Valyu  # type: ignore
-    except Exception:
+    except Exception as import_err:
+        logger.warning("_probe_valyu: failed to import valyu — %s", import_err)
         return {
             "sub_query": sub_query,
             "free_count": 0,
@@ -1360,14 +1417,18 @@ def _probe_valyu(sub_query: str, signals: dict) -> dict:
     raw_ceiling = signals.get("max_price_usd", 0) or 0
     cpm_ceiling = _to_cpm(raw_ceiling)
     # Proprietary index with max_price=0 often returns nothing; use a small floor so tier-diff runs.
-    cpm_for_proprietary = max(int(cpm_ceiling), 1)
+    cpm_for_proprietary = max(int(cpm_ceiling), 5)  # Valyu API requires max_price >= 2-4 depending on query
+    logger.info(
+        "valyu probe starting | query=%r | intent=%s | domain=%s | raw_ceiling=$%.4f | cpm=%d",
+        sub_query[:80], signals.get("intent"), signals.get("domain"), raw_ceiling, cpm_for_proprietary,
+    )
     err_note: str | None = None
     try:
         # included_sources only applies when signals["valyu_sources"] is non-empty; we do not default to a single publisher.
         free_tier = valyu.search(
             sub_query,
             search_type="all",
-            max_price=0,
+            max_price=cpm_for_proprietary,  # use same floor as paid — free tier at 0 is rejected by API
             max_num_results=5,
             included_sources=signals.get("valyu_sources") or None,
         )
@@ -1378,10 +1439,25 @@ def _probe_valyu(sub_query: str, signals: dict) -> dict:
             max_num_results=5,
             included_sources=signals.get("valyu_sources") or None,
         )
+        # Check for API-level errors returned as failed response objects (not exceptions)
+        free_err = getattr(free_tier, "error", None) if not getattr(free_tier, "success", True) else None
+        paid_err = getattr(paid_tier, "error", None) if not getattr(paid_tier, "success", True) else None
+        if free_err:
+            logger.warning("valyu free tier error | query=%r | error=%s", sub_query[:60], free_err)
+        if paid_err:
+            logger.warning("valyu paid tier error | query=%r | error=%s", sub_query[:60], paid_err)
+        if free_err and paid_err:
+            err_note = str(paid_err)[:220]
+            raise RuntimeError(err_note)
         free_results = list(getattr(free_tier, "results", []) or [])
         paid_results = list(getattr(paid_tier, "results", []) or [])
+        logger.info(
+            "valyu probe results | query=%r | free=%d | paid=%d",
+            sub_query[:80], len(free_results), len(paid_results),
+        )
     except Exception as ex:
         err_note = (str(ex) or type(ex).__name__)[:220]
+        logger.error("valyu probe exception | query=%r | error=%s", sub_query[:80], err_note)
         return {
             "sub_query": sub_query,
             "free_count": 0,
@@ -1417,6 +1493,15 @@ def _probe_valyu(sub_query: str, signals: dict) -> dict:
     # We only iterated paid_results above; if proprietary returned nothing but the free index had hits,
     # still surface those so the UI shows Valyu responded (tier-diff just has no paid-only URLs).
     only_free_fallback = False
+    if not out and not free_results:
+        logger.warning(
+            "valyu probe: both tiers empty | query=%r | cpm_for_proprietary=%d | "
+            "free_tier_status=%s | paid_tier_status=%s",
+            sub_query[:80],
+            cpm_for_proprietary,
+            getattr(free_tier, "status", "?"),
+            getattr(paid_tier, "status", "?"),
+        )
     if not out and free_results:
         only_free_fallback = True
         for r in free_results[:5]:
@@ -1514,6 +1599,7 @@ def _run_fanout_round(
         if time.time() > deadline:
             break
         signals = _infer_signals(sq_query, _signals_goal_text(sq))
+        signals["quality_threshold"] = max(signals.get("quality_threshold", 0.85), 0.85)
         sq_with_signals.append((sq, signals))
         provider_used = "Brave"
         free = _brave_search(sq_query, count=BRAVE_WEB_RESULT_COUNT)
@@ -1529,20 +1615,7 @@ def _run_fanout_round(
                 }
                 for r in fallback
             ]
-        # For news-like queries, augment free search with World News API.
-        if _is_news_like_query(signals) and _world_news_api_key_present() and time.time() <= deadline:
-            wna_results = _search_world_news_api(sq_query, signals=signals, count=10)
-            logger.info("WNA %r → %d results", sq_query[:60], len(wna_results))
-            if wna_results:
-                seen_urls = {r.get("url", "") for r in free}
-                added = 0
-                for r in wna_results:
-                    if r.get("url", "") not in seen_urls:
-                        free.append(r)
-                        seen_urls.add(r["url"])
-                        added += 1
-                logger.info("WNA merged %d new articles for %r", added, sq_query[:60])
-                provider_used = f"{provider_used}+WorldNewsAPI"
+        free = _filter_homepage_results(free)
         search_providers[sq_query] = provider_used
         for r in free:
             r["snippet_score"] = _snippet_coverage_score(r, signals)
@@ -1551,23 +1624,33 @@ def _run_fanout_round(
         enrich_free_results_with_rag(free, sq_query, deadline)
         free_results[sq_query] = free
         best_free = max([r.get("coverage_score", 0) for r in free], default=0)
-        if best_free >= signals["quality_threshold"]:
+        qt = signals["quality_threshold"]
+        logger.info(
+            "probe decision | query=%r | best_free=%.4f | quality_threshold=%.4f | gap=%s | "
+            "probes_used=%d | deadline_ok=%s",
+            sq_query[:60], best_free, qt, best_free < qt,
+            valyu_probes_used, time.time() <= deadline,
+        )
+        if best_free >= qt:
             probe_results[sq_query] = _empty_probe_record(
                 sq_query, skipped_reason="free_tier_met", attempted=False
             )
-        elif (
-            best_free < signals["quality_threshold"]
-            and valyu_probes_used < MAX_VALYU_PROBES_PER_REQUEST
-            and time.time() <= deadline
-        ):
-            probe = _probe_valyu(sq_query, signals)
+        elif valyu_probes_used >= MAX_VALYU_PROBES_PER_REQUEST:
+            # Still compute Exa estimate even when skipped — shown in UI as a quote
+            rec = _empty_probe_record(sq_query, skipped_reason="probe_budget_exhausted", attempted=False)
+            rec["exa_quote"] = _exa_price_estimate(5)
+            probe_results[sq_query] = rec
+        elif time.time() > deadline:
+            rec = _empty_probe_record(sq_query, skipped_reason="probe_deadline_exceeded", attempted=False)
+            rec["exa_quote"] = _exa_price_estimate(5)
+            probe_results[sq_query] = rec
+        else:
+            # GAP detected — show Exa price estimate and fire the probe
+            signals["max_price_usd"] = compute_bid_ceiling(signals, best_free=best_free)
+            probe = _probe_exa(sq_query, signals)
             probe_results[sq_query] = probe
             valyu_probes_used += 1
-        else:
-            probe_results[sq_query] = _empty_probe_record(
-                sq_query, skipped_reason="probe_budget_exhausted", attempted=False
-            )
-        probe_results[sq_query]["world_news_quote"] = _estimate_world_news_quote(signals, free)
+        probe_results[sq_query]["world_news_quote"] = _estimate_brave_news_quote(signals, free)
 
     return sq_with_signals, free_results, probe_results, search_providers, valyu_probes_used
 
@@ -1591,7 +1674,7 @@ def _build_sub_query_runs(
         is_gap = best_cov < qth
         gap_detail = (
             f"gap: best free relevance {best_cov:.3f} < quality floor {qth:.3f} "
-            f"(raise hit quality or use paid probe)"
+            f"— consider fetching a paid source"
             if is_gap
             else f"ok: best free relevance {best_cov:.3f} ≥ floor {qth:.3f}"
         )
@@ -1607,6 +1690,9 @@ def _build_sub_query_runs(
                     "snippet_score": round(float(r.get("snippet_score", 0) or 0), 4),
                     "rag_score": r.get("rag_score"),
                     "rag_status": r.get("rag_status"),
+                    "rag_words_fetched": r.get("rag_words_fetched"),
+                    "rag_chunks_count": r.get("rag_chunks_count"),
+                    "rag_fetch_error": r.get("rag_fetch_error"),
                     "coverage_score": round(float(r.get("coverage_score", 0) or 0), 4),
                 }
             )
@@ -1658,6 +1744,8 @@ def _build_sub_query_runs(
                     "valyu_error": pr.get("valyu_error"),
                     "valyu_only_free_tier": pr.get("valyu_only_free_tier"),
                     "valyu_proprietary_cpm_used": pr.get("valyu_proprietary_cpm_used"),
+                    "exa_quote": pr.get("exa_quote"),
+                    "exa_error": pr.get("exa_error"),
                     "world_news_quote": pr.get("world_news_quote"),
                 },
             }
@@ -1915,7 +2003,7 @@ def optimize(query, customer_id="default"):
         "planner_framework_url": DEEP_RESEARCH_FRAMEWORK_URL,
         "refanout_rounds": _refanout_round,
     }
-    bid_ceiling = max([sig["max_price_usd"] for _sq, sig in sq_with_signals] or [0.0])
+    bid_ceiling = max([sig.get("max_price_usd", 0.0) or 0.0 for _sq, sig in sq_with_signals] or [0.0])
 
     # Denominator for coverage must match rows we actually ran (search/RAG/probe), not
     # len(sub_queries) from decomposition — those can differ if we hit the deadline early.
@@ -1995,6 +2083,7 @@ def optimize(query, customer_id="default"):
     gap_n = n_runs - free_ok_n
 
     return {
+        "query": query,
         "sigs": sigs,
         "selected": selected,
         "ineligible": [],
@@ -2158,6 +2247,80 @@ def feedback_route():
     if not ok:
         return jsonify({"ok": False, "error": "event_id not found"}), 404
     return jsonify({"ok": True})
+
+
+# In-memory cache of Exa results keyed by query string. Cleared on server restart.
+_exa_result_cache: dict = {}
+
+
+@app.route("/fetch-exa", methods=["POST"])
+def fetch_exa_route():
+    """On-demand Exa fetch triggered by the user after seeing the price estimate."""
+    data = request.get_json(force=True, silent=True) or {}
+    sub_query = (data.get("query") or "").strip()
+    if not sub_query:
+        return jsonify({"error": "query required"}), 400
+    signals = _infer_signals(sub_query, "")
+    result = _exa_fetch(sub_query, signals, n_results=EXA_DEFAULT_RESULTS)
+    if not result.get("error") and result.get("results"):
+        _exa_result_cache[sub_query] = {
+            "results": result["results"],
+            "cost_usd": result.get("cost_usd", 0),
+        }
+    return jsonify(result)
+
+
+@app.route("/re-synthesize", methods=["POST"])
+def re_synthesize_route():
+    """Re-run writer synthesis merging cached Exa results into the research data."""
+    data = request.get_json(force=True, silent=True) or {}
+    original_query = (data.get("original_query") or "").strip()
+    sub_query_runs = data.get("sub_query_runs") or []
+    if not original_query or not sub_query_runs:
+        return jsonify({"error": "original_query and sub_query_runs required"}), 400
+
+    # Build enriched research blocks: free results + any cached Exa results
+    chunks: list[str] = []
+    exa_used: list[str] = []
+    for run in sub_query_runs:
+        if not isinstance(run, dict):
+            continue
+        idx = run.get("index", "?")
+        q = run.get("query") or ""
+        block_lines: list[str] = [f"\n=== SEARCH QUERY {idx}: {q} ===\n"]
+
+        # Free results (top 3 by coverage score)
+        fr = [r for r in (run.get("free_results") or []) if isinstance(r, dict)]
+        fr.sort(key=lambda r: float(r.get("coverage_score") or 0), reverse=True)
+        for r in fr[:3]:
+            title = _text_field(r.get("title"), 500) or "N/A"
+            url = str(r.get("url") or "").strip() or "N/A"
+            raw_snip = _text_field(r.get("snippet"), None) or ""
+            content_body = (raw_snip[:500] + "..." if len(raw_snip) > 500 else raw_snip) or "N/A"
+            block_lines.append(f"\nTitle: {title}\nURL: {url}\nContent: {content_body}\n")
+
+        # Exa paid results (injected when available)
+        cached = _exa_result_cache.get(q)
+        if cached and cached.get("results"):
+            block_lines.append("\n[PAID SOURCE — Exa fetch]\n")
+            for r in cached["results"][:5]:
+                title = _text_field(r.get("title"), 500) or "N/A"
+                url = str(r.get("url") or "").strip() or "N/A"
+                raw_snip = _text_field(r.get("snippet"), None) or ""
+                content_body = (raw_snip[:500] + "..." if len(raw_snip) > 500 else raw_snip) or "N/A"
+                block_lines.append(f"\nTitle: {title}\nURL: {url}\nContent: {content_body}\n")
+            exa_used.append(q)
+
+        if len(block_lines) == 1:
+            block_lines.append("No results found.\n")
+        chunks.append("".join(block_lines))
+
+    combined = "\n".join(chunks).strip()
+    if len(combined) > 28000:
+        combined = combined[:27980].rstrip() + "\n...[truncated]"
+
+    synthesis = _synthesize_research_answer(original_query, combined, _instructor_client())
+    return jsonify({"synthesis": synthesis, "exa_queries_used": exa_used})
 
 
 @app.route("/learn", methods=["GET"])

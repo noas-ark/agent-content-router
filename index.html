@@ -100,7 +100,7 @@
   .rag-rel-sub{font-size:8px;color:var(--text-muted);margin-top:5px;line-height:1.3}
   .fanout-res{border-top:1px solid var(--border);padding:8px 0}
   .fanout-res:first-of-type{border-top:none;padding-top:2px}
-  .fanout-res-title{font-size:11px;font-weight:500;color:var(--accent);text-decoration:none;display:block;line-height:1.35}
+  .fanout-res-title{font-size:11px;font-weight:500;color:#58a6ff;text-decoration:none;display:block;line-height:1.35}
   .fanout-res-title:hover{text-decoration:underline}
   .fanout-res-meta{font-size:9px;color:var(--text-muted);margin-top:3px}
   .fanout-res-snippet{font-size:10px;color:var(--text-dim);margin-top:5px;line-height:1.45}
@@ -273,6 +273,25 @@
   .article-card .art-snippet{font-size:9px;color:var(--text-dim);line-height:1.4;margin-top:6px}
   .search-unconfigured{font-size:9px;color:var(--text-muted);background:var(--surface2);border:1px dashed var(--border);border-radius:5px;padding:10px;margin-top:8px}
 
+  /* RAG detail overlay */
+  .rag-overlay-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:900;display:none}
+  .rag-overlay-backdrop.on{display:block}
+  .rag-overlay{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:901;width:min(520px,92vw);background:var(--surface);border:1px solid var(--border2);border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,.55);display:none;flex-direction:column;max-height:80vh}
+  .rag-overlay.on{display:flex}
+  .rag-overlay-head{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border);flex-shrink:0}
+  .rag-overlay-title{font-size:11px;font-weight:600;letter-spacing:.04em;color:var(--text)}
+  .rag-overlay-close{background:none;border:none;color:var(--text-muted);font-size:18px;cursor:pointer;padding:0 2px;line-height:1}
+  .rag-overlay-close:hover{color:var(--text)}
+  .rag-overlay-body{padding:14px 16px;overflow-y:auto;font-size:11px;color:var(--text-dim);line-height:1.6;display:flex;flex-direction:column;gap:10px}
+  .rag-overlay-row{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:5px 0;border-bottom:1px solid var(--border2)}
+  .rag-overlay-row:last-child{border-bottom:none}
+  .rag-overlay-k{color:var(--text-muted);font-size:10px;letter-spacing:.05em;flex-shrink:0}
+  .rag-overlay-v{color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:10px;text-align:right}
+  .rag-overlay-reason{padding:8px 10px;border-radius:5px;background:var(--surface2);border-left:3px solid var(--yellow);font-size:10px;line-height:1.5}
+  .rag-overlay-reason.ok{border-left-color:var(--green)}
+  .rag-rel-box{cursor:pointer}
+  .rag-rel-box:hover .rag-rel-lbl{color:var(--accent)}
+
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
   @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
   .fade-in{animation:fadeIn .35s ease forwards}
@@ -327,6 +346,12 @@
   .pipe-progress-label{font-size:9px;color:var(--text-muted);letter-spacing:.06em;margin-bottom:5px;min-height:14px}
   .pipe-progress-track{height:6px;background:var(--surface3);border-radius:4px;overflow:hidden;border:1px solid var(--border)}
   .pipe-progress-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--green-dim),var(--accent));border-radius:3px;transition:width .12s linear}
+  .pipe-ticker-wrap{margin-top:8px;max-height:132px;overflow-y:auto;overflow-x:hidden;scrollbar-width:none}
+  .pipe-ticker-wrap::-webkit-scrollbar{display:none}
+  .pipe-ticker-line{font-size:11px;font-family:'IBM Plex Mono',monospace;color:#8b949e;line-height:1.7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:0;transform:translateY(4px);transition:opacity .25s ease,transform .25s ease,color .25s ease}
+  .pipe-ticker-line.visible{opacity:1;transform:translateY(0)}
+  .pipe-ticker-line.current{color:#ffffff;opacity:1}
+  .pipe-ticker-line.dim{opacity:.45;color:#8b949e}
   .fanout-search-details{margin-bottom:10px;border:1px solid var(--border);border-radius:6px;background:var(--bg)}
   .fanout-search-details > summary.fanout-search-sum{cursor:pointer;list-style:none;padding:8px 12px;font-size:10px;color:var(--text-dim);letter-spacing:.06em;display:flex;align-items:center;gap:8px;flex-wrap:wrap;user-select:none}
   .fanout-search-details > summary.fanout-search-sum::-webkit-details-marker{display:none}
@@ -349,6 +374,7 @@
   .fanout-item.pricefetch-flash{animation:pricefetchFlash 1.4s ease-out 1}
   @keyframes pricefetchFlash{0%{box-shadow:0 0 0 2px rgba(210,153,34,.55)}40%{box-shadow:0 0 0 3px rgba(210,153,34,.25)}100%{box-shadow:none}}
   .fanout-gap-line{font-size:9px;color:var(--text-muted);line-height:1.45;margin:6px 0 10px;padding:6px 8px;background:var(--surface2);border-radius:4px;border-left:3px solid var(--yellow)}
+  .fanout-gap-line.fanout-ok-line{border-left-color:var(--green)}
   .dr-critic-block{margin-bottom:16px;padding:12px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:8px}
   .dr-critic-row{display:flex;gap:16px;flex-wrap:wrap;margin-top:8px}
   .dr-critic-metric{cursor:help;min-width:120px;padding:8px 10px;background:var(--bg);border:1px solid var(--border2);border-radius:6px}
@@ -416,8 +442,6 @@
     <a href="/admin" class="admin-link">Admin</a>
     <a href="/api-reference" class="badge api-ref-pill">API Reference</a>
     <div class="sep"></div>
-    <div class="tbar-stat">runs <span id="totalRuns">0</span></div>
-    <div class="tbar-stat">avg saved <span id="avgSavings">—</span></div>
     <div class="sep"></div>
     <div class="tbar-stat"><div class="pulse-dot"></div> live</div>
   </div>
@@ -441,6 +465,7 @@
     <div class="pipe-progress-wrap" id="pipeProgressWrap">
       <div class="pipe-progress-label" id="pipeProgressLabel">Starting…</div>
       <div class="pipe-progress-track"><div class="pipe-progress-fill" id="pipeProgressFill"></div></div>
+      <div class="pipe-ticker-wrap" id="pipeTickerWrap"></div>
     </div>
   </div>
 </div>
@@ -451,7 +476,7 @@
     <div class="pipeline-nav-steps" role="tablist" aria-label="Optimize pipeline">
       <button type="button" class="pipe-step active" role="tab" data-main-tab="signals" onclick="switchMainTab('signals')">signals<span class="tab-dot"></span></button>
       <span class="pipe-connector" aria-hidden="true"></span>
-      <button type="button" class="pipe-step" role="tab" data-main-tab="subqueries" onclick="switchMainTab('subqueries')">fan-out<span class="tab-dot"></span></button>
+      <button type="button" class="pipe-step" role="tab" data-main-tab="subqueries" onclick="switchMainTab('subqueries')">subqueries<span class="tab-dot"></span></button>
       <span class="pipe-connector" aria-hidden="true"></span>
       <button type="button" class="pipe-step" role="tab" data-main-tab="search" onclick="switchMainTab('search')">search<span class="tab-dot"></span></button>
       <span class="pipe-connector" aria-hidden="true"></span>
@@ -473,7 +498,7 @@
   <div class="pb" id="detailP">
     <div class="empty">
       <div class="empty-icon">⬡</div>
-      <div>Run Optimize to see<br>signals → fan-out → search → price fetch → plan → answer<br><br><span style="font-size:9px;opacity:.6">Pipeline log (top right) · answer = synthesized from snippets when LLM is configured</span></div>
+      <div>Run Optimize to see<br>signals → subqueries → search → price fetch → plan → answer</div>
     </div>
   </div>
 </div>
@@ -486,15 +511,14 @@
 // ═══════════════════════════════════════════════════════════════
 
 const SCENARIOS = [
-  {tag:"Policy Compare",    q:"Compare the economic impacts of renewable energy policies in Europe vs North America"},
-  {tag:"Macro Outlook",     q:"Compare how top sell-side economists project US vs Eurozone inflation and rate paths over the next 12 months"},
-  {tag:"Semis Deep Dive",   q:"Compare TSMC, Samsung, and Intel foundry margin outlooks using recent analyst notes and management guidance"},
-  {tag:"Energy Markets",    q:"Evaluate competing forecasts for LNG demand and pricing in Europe through 2027 using institutional research"},
-  {tag:"M&A Antitrust",     q:"Assess likely antitrust outcomes for major US-EU tech M&A cases using legal analysis and regulator commentary"},
-  {tag:"AI Regulation",     q:"Compare compliance and cost implications of the EU AI Act vs US state AI laws for foundation model providers"},
-  {tag:"Healthcare HTA",    q:"Compare payer and HTA perspectives on GLP-1 obesity treatments across the US, UK, and Germany"},
-  {tag:"Private Credit",    q:"Analyze default risk outlook in US middle-market private credit from lender reports and rating-agency commentary"},
-  {tag:"Defense Supply",    q:"Assess bottlenecks in NATO defense supply chains using policy papers, contractor disclosures, and specialist reporting"},
+  {tag:"DeFi Regulation",   q:"What SEC and CFTC enforcement actions targeted DeFi protocols and on-chain derivatives in Q1 2025, and what precedents do they set for token issuers?"},
+  {tag:"Private Credit",    q:"Analyze covenant-lite default trends and recovery rates in US middle-market private credit using lender loss data and rating-agency reports from Q1 2025"},
+  {tag:"Drug Pricing",      q:"What is the latest net pricing data and rebate trends for GLP-1 drugs in the US from PBM and payer reports, and how does this compare to list price?"},
+  {tag:"LNG Spreads",       q:"What are current JKM–TTF–Henry Hub spread dynamics and what do specialist energy trading desks forecast for Q3 2025 LNG arbitrage windows?"},
+  {tag:"Semis Supply",      q:"What is the current lead-time and allocation status for advanced packaging capacity at TSMC CoWoS and Samsung 2.5D nodes as of Q1 2025?"},
+  {tag:"M&A Antitrust",     q:"Assess likely antitrust outcomes for major US-EU tech M&A cases filed in 2025 using the latest DOJ/FTC statements and legal analysis"},
+  {tag:"AI Liability",      q:"What product-liability and IP indemnification terms are frontier AI vendors offering enterprise customers in 2025 contracts, and how do they differ?"},
+  {tag:"Defense Supply",    q:"Assess bottlenecks in NATO 155mm artillery shell production capacity using contractor disclosures and specialist defense-industry reporting from 2025"},
 ];
 
 let totalRuns=0, sumSavings=0;
@@ -520,7 +544,7 @@ function getFanoutPillTips() {
   if (_fanoutPillTips) return _fanoutPillTips;
   _fanoutPillTips = {
     queryFanoutHeading: registerTip(
-      '<b>Query fanout</b><div class="t-calc"><b>What it is</b> — Your question is split into <b>several distinct web search strings</b> (one facet per sub-query) so each retrieval pass stays focused.<br><br><b>How sub-queries are produced</b> — With an OpenAI API key, the server runs <code>plan_search_tasks</code>: <b>gpt-4o-mini</b> (Instructor, structured output) returns a deduped list capped at the configured maximum — same <i>planner</i> idea as <code>deep_reasoning_researcher</code>. Without a key or if that call fails, <code>_decompose_query_local</code> uses lightweight rules (short query → one search; long text → token-window splits).</div>'
+      '<b>Query fanout</b><div class="t-calc"><b>What it is</b> — Your question is split into <b>several distinct web search strings</b> (one facet per sub-query) so each retrieval pass stays focused.<br><br><b>How sub-queries are produced</b> — When an LLM API key is configured, a structured planner returns a deduped list of search tasks capped at the configured maximum. Without a key, lightweight local rules decompose the query (short query → one search; long text → token-window splits).</div>'
     ),
     floor: registerTip(
       '<b>Quality floor</b><div class="t-calc">Minimum relevance this sub-query needs from a <b>free</b> hit, from routing signals (<code>quality_threshold</code>). Compare with results in the <b>search</b> step.</div>'
@@ -595,7 +619,7 @@ function coverageBadgeTipRegister(covStr) {
       (covInc
         ? '<b>Incomplete</b> — Numerator &lt; denominator: at least one sub-query still needed paid-tier value or did not meet the free quality floor, so <b>a purchase or bid</b> may be part of the optimized plan.<br><br>'
         : '<b>Full coverage</b> — Every sub-query met the bar with free hits (or equivalent).<br><br>') +
-      'Counts sub-queries where the best free hit met that sub-query’s quality floor (or a paid hit was used) vs. all sub-queries run. Valyu price fetches run on gap sub-queries, up to <code>MAX_VALYU_PROBES_PER_REQUEST</code> per Optimize.</div>'
+      `Counts sub-queries where the best free hit met that sub-query’s quality floor (or a paid hit was used) vs. all sub-queries run.</div>`
   );
   return { tipId: id, warn: covInc };
 }
@@ -718,7 +742,7 @@ function buildSigObjects(sigs) {
       semantic: {v: R.semantic,
         tip: `<b>Semantic Match · ${pct(R.semantic)}</b>Query text compared against 6 intent profile vocabularies using keyword cosine similarity.<div class="t-calc">Top intent: <span class="t-val">${(intent||'').replace(/_/g,' ')}</span> (score: ${intentScores && intentScores[intent] != null ? intentScores[intent].toFixed(3) : '—'})<br>Formula: intersection(query_words, profile_words) / √(|query| × |profile|)<br>Scaled: raw×3.8 + 0.22, capped at 0.98</div>`},
       entityDensity: {v: R.entityDensity,
-        tip: `<b>Entity Density · ${pct(R.entityDensity)}</b>Named entities from spaCy NER (any casing); years only if the model is unavailable.<div class="t-calc">Entities found: <span class="t-val">${entities.length > 0 ? entities.slice(0,5).join(', ') : 'none'}</span><br>Formula: min(entity_count / 7, 1.0)<br>Source: FB paper §3.1 "entity linking" component</div>`},
+        tip: `<b>Entity Density · ${pct(R.entityDensity)}</b>Named entities detected in the query.<div class="t-calc">Entities found: <span class="t-val">${entities.length > 0 ? entities.slice(0,5).join(', ') : 'none'}</span><br>Formula: min(entity_count / 7, 1.0)<br>Source: FB paper §3.1 "entity linking" component</div>`},
       specificity: {v: R.specificity,
         tip: `<b>Specificity · ${pct(R.specificity)}</b>How narrow vs. broad the query is. Specific queries justify paying for exact-match content.<div class="t-calc">Markers checked: Q1–Q4, year references, $amounts, %, IPO, CEO, "exactly", "specific"<br>Triggered: <span class="t-val">${R.specificTriggered ? 'yes — scored 0.88' : 'no — scored by length (' + R.wordCount + ' words)'}</span><br>Narrow queries (0.8+) pay for precision; broad queries (0.3–0.5) can use general sources</div>`},
       templateBoost: {v: R.templateBoost,
@@ -877,7 +901,7 @@ function buildResearchCompletenessHtml(res) {
   );
   const mode = rc.mode === 'llm' ? 'LLM critic' : 'Heuristic fallback';
   const modeTip = registerTip(
-    '<b>Critic mode</b><div class="t-calc"><b>LLM critic</b> — gpt-4o-mini scores completeness 0–1 from your original question plus a digest of titles/snippets from free search (same role as the critic node in deep_reasoning_researcher).<br><br><b>Heuristic fallback</b> — used when no OpenAI key is configured or the critic call failed. The percent blends how many sub-queries met their quality floor with the average best-hit relevance; “more info needed” uses gaps plus a low completeness threshold.</div>'
+    '<b>Critic mode</b><div class="t-calc"><b>LLM critic</b> — an LLM scores completeness 0–1 from your original question plus a digest of free search results.<br><br><b>Heuristic fallback</b> — used when no LLM key is configured or the call fails. The percent blends how many sub-queries met their quality floor with the average best-hit relevance; “more info needed” uses gaps plus a low completeness threshold.</div>'
   );
   return `
     <div class="dr-critic-block">
@@ -923,7 +947,6 @@ function buildFanoutSplit(res, sigs) {
               <span class="fanout-chip" data-tipid="${ft.intent}" style="cursor:help">intent: ${escapeHtml(intent)}</span>
               <span class="fanout-chip" data-tipid="${ft.domain}" style="cursor:help">domain: ${escapeHtml(domain)}</span>
               ${ctype ? `<span class="fanout-chip" data-tipid="${ft.content}" style="cursor:help">content: ${escapeHtml(ctype)}</span>` : ''}
-              <span class="fanout-chip" data-tipid="${ft.ceiling}" style="cursor:help">ceiling: ${escapeHtml(mp)}</span>
             </div>
           </div>
         </div>
@@ -938,8 +961,8 @@ function buildFanoutSplit(res, sigs) {
       </div>
       ${rows}
     </div>`,
-      search: '<div class="fanout-nores" style="padding:10px 0">Brave free-tier hits appear when the response includes <code>sub_query_runs</code>.</div>',
-      probe: '<div class="fanout-nores" style="padding:10px 0">Valyu price-fetch rows appear when the response includes <code>sub_query_runs</code> with Valyu data per sub-query.</div>'
+      search: '<div class="fanout-nores" style="padding:10px 0">Free search hits appear when the response includes <code>sub_query_runs</code>.</div>',
+      probe: '<div class="fanout-nores" style="padding:10px 0">Paid source fetch rows appear here after a GAP sub-query triggers a paid-tier probe.</div>'
     };
   }
 
@@ -947,7 +970,7 @@ function buildFanoutSplit(res, sigs) {
   const searchParts = [];
   const probeParts = [];
   const probePriceTipId = registerTip(
-    '<b>Valyu price rows</b><div class="t-calc"><b>Est. catalog</b> — rough per-article $ from our domain map (journals, news, markets, etc.); shown on every row for context.<br><br><b>Proprietary-only URL</b> — in Valyu&apos;s paid (proprietary) results for this query but not in the free index; Plan &amp; buy may use the catalog as an incremental paid ask when it is &gt; 0.<br><br><b>Also in free index</b> — same URL in both tiers: incremental ask is usually $0; catalog still shown.<br><br><b>Why one domain?</b> bootk does not filter to a publisher. If every row is e.g. Kalshi, Valyu&apos;s ranking plus your sub-query wording favored that index for this call.</div>'
+    '<b>Paid source fetch rows</b><div class="t-calc"><b>Est. catalog</b> — rough per-article $ from our domain map (journals, news, markets, etc.); shown on every row for context.<br><br><b>Paid-only URL</b> — in the paid index for this query but not in the free index; Plan &amp; buy may use the catalog as an incremental paid ask when it is &gt; 0.<br><br><b>Also in free index</b> — same URL in both tiers: incremental ask is usually $0; catalog still shown.<br><br><b>Why one domain?</b> bootk does not restrict by publisher — if you only see one site, the paid index ranked those URLs highest for this sub-query.</div>'
   );
   runs.forEach((run) => {
     const sg = (subs.find(s => s.query === run.query) || {}).signals || {};
@@ -994,7 +1017,7 @@ function buildFanoutSplit(res, sigs) {
             ${paywallNote}
             ${r.snippet ? `<div class="fanout-res-snippet">${escapeHtml(r.snippet)}</div>` : ''}
           </div>
-          <div class="rag-rel-box" data-tipid="${ragTipId}">
+          <div class="rag-rel-box" data-tipid="${ragTipId}" title="Click for RAG fetch details" onclick='openRagOverlay(${JSON.stringify(r)})'>
             <div class="rag-rel-lbl">Relevance</div>
             <div class="rag-rel-num">${covPct}%</div>
             <div class="rag-rel-bar"><div style="width:${w.toFixed(1)}%"></div></div>
@@ -1009,80 +1032,49 @@ function buildFanoutSplit(res, sigs) {
     const valyuOk = (res.v4 || {}).valyu_configured === true;
     const vyuErr = pb.valyu_error;
     const onlyFree = pb.valyu_only_free_tier === true;
-    const wnaQ = pb.world_news_quote || null;
-    const worldNewsQuoteHtml = wnaQ && wnaQ.eligible
-      ? `<div class="fanout-nores" style="margin-bottom:10px;line-height:1.5;border-left:2px solid rgba(56,139,253,.55);padding:6px 0 6px 10px">
-          <div style="font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:3px">World News API quote (estimate)</div>
-          <div><b>Estimated cost</b> — ${fmt$(Number(wnaQ.estimated_usd || 0))} for this sub-query (${escapeHtml(String(wnaQ.estimated_points || 0))} credits @ ${fmt$(Number(wnaQ.reporter_usd_per_point || 0.003))}/credit).</div>
-          <div style="opacity:.88">Formula anchor: <code style="font-size:9px">1 + 0.01 × results</code> points (typical docs rule). Estimated WNA results in this run: <b>${escapeHtml(String(wnaQ.estimated_results || 0))}</b>.</div>
-          ${wnaQ.api_key_configured === false ? '<div style="color:var(--yellow);opacity:.95">WORLD_NEWS_API_KEY not configured — formula-only estimate.</div>' : ''}
+    const isGap = run.coverage_status === 'gap';
+    const exaQ = pb.exa_quote || null;
+    const exaErr = pb.exa_error || null;
+    const exaQuoteHtml = isGap && exaQ
+      ? `<div class="fanout-nores" style="margin-bottom:10px;line-height:1.6;border-left:2px solid rgba(56,139,253,.7);padding:6px 0 6px 10px">
+          <div style="font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px">Paid fetch — price estimate</div>
+          <div style="font-size:13px;margin-bottom:3px"><b>${fmt$(Number(exaQ.total_usd || 0))}</b> to resolve this gap</div>
+          <div style="font-size:10px;opacity:.7">${escapeHtml(exaQ.formula || '')} — fetch from Plan &amp; buy tab</div>
         </div>`
       : '';
     let probeHtml = '';
-    if (vyuErr) {
+    if (exaErr) {
       probeHtml =
-        '<div class="fanout-nores" style="line-height:1.5">Valyu request failed during the price fetch (API error).<br><span style="opacity:.85;font-size:10px">' +
-        escapeHtml(String(vyuErr)) +
+        '<div class="fanout-nores" style="line-height:1.5">Paid fetch failed.<br><span style="opacity:.85;font-size:10px">' +
+        escapeHtml(String(exaErr)) +
         '</span></div>';
     } else if (plist.length) {
-      const freeTierNote = onlyFree
-        ? '<div class="fanout-nores" style="margin-bottom:10px;line-height:1.45;border-left:2px solid rgba(57,211,83,.45);padding:6px 0 6px 10px">The <b>proprietary</b> Valyu search returned no URLs for this sub-query, but the <b>free index</b> did return matches — Valyu is working; there is nothing extra behind the paid tier for this phrasing. (Proprietary search uses a non-zero <code style="font-size:9px">max_price</code> so the paid index can return results.)</div>'
-        : '';
       probeHtml =
-        freeTierNote +
-        `<div class="fanout-subhdr">Valyu price fetch</div>
-          <p class="fanout-valyu-lede" style="font-size:10px;line-height:1.5;margin:0 0 8px;color:var(--text-dim)">We run two Valyu searches: the <b>free web index</b> (<code style="font-size:9px">max_price=0</code>) and the <b>proprietary (paid) index</b>. The table below is built from the proprietary response, with our per-domain catalog $ overlay. <span style="opacity:.9">Domains are not restricted by bootk—if you only see one site, Valyu ranked those URLs highest for this sub-query.</span></p>
-          <div class="fanout-valyu-stats" style="font-size:10px;line-height:1.55;margin-bottom:8px;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background:rgba(127,127,127,.04)">
-            <div><b>Free index</b> — ${pb.free_count} hit(s)</div>
-            <div><b>Proprietary index</b> — ${pb.paid_count} hit(s)</div>
-            <div><b>URLs only in proprietary</b> — ${pb.new_at_paid} (not in free; Plan &amp; buy may treat these as paid-only when catalog &gt; 0)</div>
-            ${pb.valyu_proprietary_cpm_used != null ? `<div><b>Proprietary CPM cap</b> (sent to Valyu) — ${escapeHtml(String(pb.valyu_proprietary_cpm_used))}</div>` : ''}
-          </div>
-          <div class="fanout-res-meta" style="margin-bottom:8px;font-size:9px;line-height:1.45" data-tipid="${probePriceTipId}"><b>Rows</b> — estimated catalog $ per article from our domain map. <b>Plan &amp; buy</b> uses proprietary-only URLs when estimating a non-zero paid line item. <span style="cursor:help;border-bottom:1px dotted var(--text-muted)">Hover for glossary</span>.</div>
-          ${plist.map(pr => {
-            const cat = pr.estimated_catalog_usd != null ? Number(pr.estimated_catalog_usd) : null;
-            const inc = pr.incremental_paid_only === true;
-            const catStr = cat != null && !Number.isNaN(cat) ? ' · est. catalog ' + fmt$(cat) : '';
-            const tierStr = inc
-              ? ' · <span style="color:var(--yellow)">paid-tier only</span>'
-              : ' · <span style="opacity:.8">also in free index</span>';
-            const incAsk = pr.inferred_price != null && Number(pr.inferred_price) > 0
-              ? ' · incremental ask ' + fmt$(Number(pr.inferred_price))
-              : '';
-            return `
+        `<div class="fanout-subhdr">Paid results — ${plist.length} article${plist.length !== 1 ? 's' : ''} fetched</div>
+          ${plist.map(pr => `
           <div class="fanout-res">
             <a class="fanout-res-title" href="${escapeHtml(pr.url)}" target="_blank" rel="noopener">${escapeHtml(pr.title || '(No title)')}</a>
-            <div class="fanout-res-meta">${escapeHtml(pr.source || '—')} · ${escapeHtml(pr.unlocked_at || '')}${catStr}${tierStr}${incAsk}</div>
+            <div class="fanout-res-meta">${escapeHtml(pr.source || '—')}${pr.date ? ' · ' + escapeHtml(String(pr.date).slice(0,10)) : ''}</div>
             ${pr.snippet ? `<div class="fanout-res-snippet">${escapeHtml(pr.snippet)}</div>` : ''}
-          </div>`;
-          }).join('')}`;
+          </div>`).join('')}`;
     } else if (skipped === 'free_tier_met' || run.coverage_status === 'ok') {
       probeHtml =
-        '<div class="fanout-nores">Free tier met the quality floor for this sub-query — no Valyu price fetch was needed.</div>';
+        '<div class="fanout-nores">Free search met the quality floor for this sub-query — no paid fetch needed.</div>';
     } else if (skipped === 'probe_budget_exhausted') {
       probeHtml =
-        '<div class="fanout-nores">Valyu price fetch skipped: this Optimize call already hit the maximum number of gap fetches (see <code style="font-size:9px">MAX_VALYU_PROBES_PER_REQUEST</code> in the server env). Earlier gap sub-queries used the budget.</div>';
-    } else if (run.coverage_status === 'gap' && attempted && !plist.length) {
-      const counts =
-        (pb.free_count != null ? Number(pb.free_count) : 0) +
-        (pb.paid_count != null ? Number(pb.paid_count) : 0);
+        '<div class="fanout-nores">Paid fetch skipped — budget used by an earlier gap sub-query.</div>';
+    } else if (skipped === 'probe_deadline_exceeded') {
       probeHtml =
-        '<div class="fanout-nores" style="line-height:1.55">Valyu responded, but there were no rows to list after merging tiers (free+proprietary both empty for this sub-query).' +
-        (counts === 0 && valyuOk
-          ? ' Try a shorter query, different keywords, or confirm this topic is in Valyu&apos;s index for the date range you care about.'
-          : '') +
-        (!valyuOk
-          ? ' Set <code style="font-size:9px">VALYU_API_KEY</code> (or <code style="font-size:9px">DSAIL_VALYU_API_KEY</code>) to enable Valyu.'
-          : '') +
-        '</div>';
+        '<div class="fanout-nores">Paid fetch skipped — pipeline ran out of time.</div>';
+    } else if (run.coverage_status === 'gap' && attempted && !plist.length) {
+      probeHtml =
+        '<div class="fanout-nores" style="line-height:1.55">Paid fetch returned no results for this sub-query. Try rephrasing the query.</div>';
     }
-    const gapLine = run.coverage_gap_detail
-      ? `<div class="fanout-gap-line">${escapeHtml(run.coverage_gap_detail)}</div>`
-      : '';
-
-    const isGap = run.coverage_status === 'gap';
     const bcPct = run.best_coverage != null ? (run.best_coverage * 100).toFixed(0) : '—';
     const flPct = run.quality_threshold != null ? (run.quality_threshold * 100).toFixed(0) : '—';
+    const gapLine = run.coverage_gap_detail
+      ? `<div class="fanout-gap-line${isGap ? '' : ' fanout-ok-line'}">${escapeHtml(run.coverage_gap_detail)}</div>`
+      : '';
 
     subParts.push(`
       <div class="fanout-item" id="fanout-run-${run.index}" data-sq-index="${run.index}">
@@ -1095,7 +1087,6 @@ function buildFanoutSplit(res, sigs) {
               <span class="fanout-chip" data-tipid="${ft.intent}" style="cursor:help">intent: ${escapeHtml(intent)}</span>
               <span class="fanout-chip" data-tipid="${ft.domain}" style="cursor:help">domain: ${escapeHtml(domain)}</span>
               ${ctype ? `<span class="fanout-chip" data-tipid="${ft.content}" style="cursor:help">content: ${escapeHtml(ctype)}</span>` : ''}
-              <span class="fanout-chip" data-tipid="${ft.ceiling}" style="cursor:help">ceiling: ${escapeHtml(mp)}</span>
             </div>
           </div>
         </div>
@@ -1105,10 +1096,10 @@ function buildFanoutSplit(res, sigs) {
       ? `<span class="search-sq-query-link" role="button" tabindex="0" title="Open Price fetch tab for this sub-query (may need paid source)" onclick="event.preventDefault();event.stopPropagation();goToProbeSubquery(${run.index})">${qHead}</span>`
       : `<span>${qHead}</span>`;
     const covPill = isGap
-      ? `<button type="button" class="search-cov-pill search-cov-gap" title="Open Price fetch for this sub-query" onclick="event.preventDefault();event.stopPropagation();goToProbeSubquery(${run.index})">GAP</button><span class="search-cov-meta">best ${bcPct}% · floor ${flPct}%</span>`
+      ? `<button type="button" class="search-cov-pill search-cov-gap" title="Sub-query #${run.index} is not covered by free content — best relevance (${bcPct}%) is below the quality floor (${flPct}%). A paid source may be needed. Click to see Price fetch." onclick="event.preventDefault();event.stopPropagation();goToProbeSubquery(${run.index})">GAP</button><span class="search-cov-meta">best ${bcPct}% · floor ${flPct}%</span>`
       : `<span class="search-cov-pill search-cov-ok">OK</span><span class="search-cov-meta">best ${bcPct}% · floor ${flPct}%</span>`;
     const probeBtn = isGap
-      ? `<button type="button" class="search-pricefetch-jump" data-pricefetch-jump="${run.index}" onclick="event.preventDefault();event.stopPropagation();goToProbeSubquery(${run.index})" title="Open Price fetch tab (Valyu paid-tier check)">Price fetch →</button>`
+      ? `<button type="button" class="search-pricefetch-jump" data-pricefetch-jump="${run.index}" onclick="event.preventDefault();event.stopPropagation();goToProbeSubquery(${run.index})" title="Open paid source fetch tab">Price fetch →</button>`
       : '';
     searchParts.push(`
       <details class="fanout-search-details${isGap ? ' fanout-search-gap' : ''}" data-sq-index="${run.index}" id="search-sq-${run.index}">
@@ -1127,12 +1118,21 @@ function buildFanoutSplit(res, sigs) {
       </details>`);
 
     const probeBody =
-      worldNewsQuoteHtml + (
+      `<div id="probe-exa-body-${run.index}">` +
+      exaQuoteHtml + (
       probeHtml ||
-      '<div class="fanout-nores">No Valyu price-fetch data for this sub-query.</div>');
-    const covForProbe = run.coverage_status === 'gap'
-      ? `<div class="hit-cov-badge hit-cov-gap" style="margin-bottom:8px">Free-tier coverage · <b>GAP</b> — best Brave hit is still below the quality floor (Valyu may run to price paid inventory).</div>`
-      : `<div class="hit-cov-badge hit-cov-ok" style="margin-bottom:8px">Free-tier coverage · <b>OK</b> — floor met or no probe needed for this sub-query.</div>`;
+      `<div class="fanout-nores">No paid sources fetched</div>`) +
+      `</div>`;
+    const ceilingChip = isGap && mp !== '—' && mp !== '$0.000'
+      ? `<span class="fanout-chip" data-tipid="${ft.ceiling}" style="cursor:help;font-variant-numeric:tabular-nums;letter-spacing:.02em">bid ceiling&nbsp;${escapeHtml(mp)}</span>`
+      : '';
+    const covForProbe = isGap
+      ? `<div class="hit-cov-badge hit-cov-gap" style="margin-bottom:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+           <span><b>GAP</b> — best ${bcPct}% · floor ${flPct}% · paid source may be needed</span>
+           ${ceilingChip}
+           <button type="button" onclick="switchMainTab('plan')" style="margin-left:auto;flex-shrink:0;background:rgba(57,211,83,.12);border:1px solid rgba(57,211,83,.3);color:var(--accent);font-size:9px;padding:2px 8px;border-radius:3px;cursor:pointer;font-family:inherit;letter-spacing:.04em">Plan &amp; buy →</button>
+         </div>`
+      : `<div class="hit-cov-badge hit-cov-ok" style="margin-bottom:8px"><b>OK</b> — floor met</div>`;
     probeParts.push(`
       <div class="fanout-item" id="probe-run-${run.index}" data-sq-index="${run.index}">
         <div class="fanout-item-hd">
@@ -1156,7 +1156,7 @@ function buildFanoutSplit(res, sigs) {
           : `Sub-queries <b>${gapIndices.map(i => '#' + i).join(', ')}</b> are`;
       searchLegend =
         `<div class="search-coverage-legend search-coverage-legend-gap"><span style="display:block;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px">Free-tier coverage</span>` +
-        `${gapLead} <b>GAP</b> — best free relevance is still below the quality floor, so a <b>paid</b> source may be needed.</div>`;
+        `${gapLead} not covered by free content — relevance is still below the quality floor, so a <b>paid</b> source may be needed. See the <b>GAP</b> pill on each affected sub-query, or jump to <b>Price fetch</b> for details.</div>`;
     } else {
       searchLegend =
         '<div class="search-coverage-legend search-coverage-legend-allok"><span style="display:block;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px">Free-tier coverage</span>All sub-queries: <b>OK</b> — best free hit met or exceeded the quality floor (or no hits to compare).</div>';
@@ -1183,109 +1183,160 @@ function buildFanoutSplit(res, sigs) {
 
   return {
     subqueries: `<div class="fanout-block">${titleRow('Query fanout', ft.queryFanoutHeading, false)}${subParts.join('')}</div>`,
-    search: `<div class="fanout-block">${titleRow('Brave search (free tier)')}${searchLegend}${searchParts.join('')}</div>`,
-    probe: `<div class="fanout-block">${titleRow('Valyu price fetch')}${probeParts.join('')}</div>`
+    search: `<div class="fanout-block">${titleRow('Free search')}${searchLegend}${searchParts.join('')}</div>`,
+    probe: `<div class="fanout-block">${titleRow('Paid source fetch')}${probeParts.join('')}</div>`
   };
 }
 
 function buildPlanTabHtml(res) {
   const sigs = res.sigs || {};
-  const selected = res.selected || [];
-  const smartCost = res.smartCost ?? 0;
-  const smartQ = res.smartQ ?? 0;
-  const naiveCost = res.naiveCost ?? 0;
-  const naiveQ = res.naiveQ ?? 0;
-  const savings = res.savings ?? 0;
-  const savingsPct = res.savingsPct ?? 0;
-  const bid_ceiling = res.bid_ceiling;
+  const runs = res.v4?.sub_query_runs || [];
   const allScored = res.allScored || [];
+  const bid_ceiling = res.bid_ceiling;
+  const gaps = runs.filter(r => r.coverage_status === 'gap' && r.probe?.exa_quote);
+  const okRuns = runs.filter(r => r.coverage_status !== 'gap');
+  const exaProjected = gaps.reduce((sum, g) => sum + (g.probe.exa_quote.total_usd || 0), 0);
+  const allPaidCost = runs.length * 0.007;
 
-  const items = selected.map(s=>`
-    <div class="pi">
-      <div class="pi-name">${s.name}</div>
-      <div class="pi-util">${pct(s.utility)}</div>
-      <div class="pi-price">${(s.price == null || s.price === 0)?'FREE':'$'+Number(s.price).toFixed(2)}</div>
-    </div>`).join('');
-
-  const bidRows = (allScored || []).map(s => {
-    const askP = Number(s.price);
-    const ask = !Number.isFinite(askP) || askP === 0 ? 'FREE' : '$' + askP.toFixed(2);
-    const bid = !Number.isFinite(askP) || askP === 0 ? '—' : '$' + (s.our_bid != null ? s.our_bid.toFixed(3) : '0');
-    const dec = (s.bid_decision || (!Number.isFinite(askP) || askP === 0 ? 'buy' : (s.our_bid >= askP ? 'buy' : 'pass')));
-    const d = s.bid_detail || {};
-    const utilN = Number(s.utility);
-    let tipHtml = '';
-    if (!Number.isFinite(askP) || askP === 0) {
-      tipHtml = '<b>FREE source</b><br>Always buy — no bid required.';
-    } else {
-      tipHtml = '<b>How this bid was calculated</b><br>' +
-        'Formula: <code>' + escapeHtml(d.formula || 'Ask × (0.72 + 0.28 × utility)') + '</code><br>' +
-        'Your utility: ' + (d.utility_pct != null ? d.utility_pct + '%' : pct(s.utility)) + '<br>' +
-        'Calculation: $' + askP.toFixed(2) + ' × ' + (0.72 + 0.28 * (Number.isFinite(utilN) ? utilN : 0)).toFixed(2) + ' = $' + (s.our_bid || 0).toFixed(3) + '<br><br>' +
-        '<b>Anonymized other bidders</b><br>' +
-        (d.n_others ? d.n_others + ' other bid(s) on similar inventory.<br>' : '') +
-        (d.median_other != null ? 'Median bid: $' + d.median_other.toFixed(3) + '<br>' : '') +
-        (d.percentile != null ? 'You rank in top ' + (100 - d.percentile) + '% of bidders.' : '');
-    }
-    const tipId = registerTip(tipHtml);
-    const bidCell = !Number.isFinite(askP) || askP === 0
-      ? `<td>—</td>`
-      : `<td class="bid-clickable" data-tipid="${tipId}" title="Click or hover for calculation details">${bid}</td>`;
-    return `<tr><td>${escapeHtml(s.name)}</td><td>${ask}</td>${bidCell}<td class="${dec==='buy'?'dec-buy':'dec-pass'}">${dec}</td></tr>`;
-  }).join('');
-
-  const bidCeil = bid_ceiling != null ? `Value ceiling: $${bid_ceiling.toFixed(3)} (from stakes + credibility + freshness)` : '';
-  const pipelineRight = buildPipelineRightBlock(res);
-  const scNum = Number(smartCost);
-  const zeroPlanNote =
-    Number.isFinite(scNum) && scNum <= 0
-      ? `<div class="plan-summary-box"><b>Optimized cost is $0</b> — no priced inventory was selected (free sources only, or no paid asks). The run still includes decomposition, Brave search, Valyu when there is a <b>coverage gap</b>, bid evaluation, and an <b>answer</b> synthesized from gathered evidence. A positive total means at least one paid ask was included in the plan.</div>`
-      : '';
-
-  return `
-  <div class="fade-in">
-    ${zeroPlanNote}
-    ${pipelineRight}
-    <div class="right-tabs">
-      <div class="right-tab active" data-tab="plan" onclick="switchRightTab('plan')">Plan</div>
-      <div class="right-tab" data-tab="bidding" onclick="switchRightTab('bidding')">Bidding</div>
-    </div>
-    <div id="rightPlanContent" class="right-tab-content">
-    <div style="font-size:9px;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px">Cost Comparison</div>
-    <div class="metric-pair">
-      <div class="mc"><div class="mc-lbl">Naive (top-3 authority)</div>
-        <div class="mc-val" style="color:var(--red)">${fmt$(naiveCost)}</div>
-        <div class="mc-sub">${pct(naiveQ)} avg quality</div>
+  // ── Free sources block (collapsed by default) ──────────────────────────
+  const freeSources = runs.flatMap(r =>
+    (r.free_results || []).map(fr => ({...fr, _sq: r.query, _sq_idx: r.index}))
+  ).filter(fr => fr.url);
+  const coveredCount = okRuns.length;
+  const totalRuns = runs.length;
+  const covColor = coveredCount === totalRuns ? 'var(--green)' : coveredCount > 0 ? '#e3b341' : 'var(--red)';
+  const freeSourcesHtml = freeSources.length ? `
+    <details class="plan-section-details" style="margin-bottom:12px">
+      <summary class="plan-section-hdr" style="cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between">
+        <span style="font-size:9px;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase">Free sources <span style="color:var(--text-dim);font-weight:400">(${freeSources.length} scraped)</span> <span style="color:${covColor};font-weight:600">${coveredCount}/${totalRuns} covered</span></span>
+        <span style="font-size:9px;color:var(--text-muted)">▼</span>
+      </summary>
+      <div style="margin-top:8px;display:flex;flex-direction:column;gap:6px">
+        ${freeSources.map(fr => {
+          const cov = fr.coverage_score != null ? Math.round(fr.coverage_score * 100) : null;
+          const covColor = cov == null ? 'var(--text-muted)' : cov >= 85 ? 'var(--green)' : cov >= 65 ? '#e3b341' : 'var(--red)';
+          return `<div style="padding:6px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;display:flex;align-items:flex-start;gap:8px">
+            <div style="flex:1;min-width:0">
+              <a href="${escapeHtml(fr.url)}" target="_blank" rel="noopener" class="fanout-res-title" style="font-size:11px">${escapeHtml(fr.title || fr.url)}</a>
+              <div style="font-size:9px;color:var(--text-muted);margin-top:2px">${escapeHtml(fr.source || new URL(fr.url).hostname)} · sq #${fr._sq_idx}</div>
+              ${fr.snippet ? `<div style="font-size:10px;color:var(--text-dim);margin-top:3px;line-height:1.4">${escapeHtml((fr.snippet||'').slice(0,140))}${(fr.snippet||'').length>140?'…':''}</div>` : ''}
+            </div>
+            ${cov != null ? `<span style="flex-shrink:0;font-size:10px;font-weight:600;color:${covColor}">${cov}%</span>` : ''}
+          </div>`;
+        }).join('')}
       </div>
-      <div class="mc"><div class="mc-lbl">Optimized</div>
-        <div class="mc-val" style="color:var(--green)">${fmt$(smartCost)}</div>
-        <div class="mc-sub">${pct(smartQ)} avg quality</div>
-      </div>
-    </div>
-    <div class="mc">
-      <div class="mc-lbl">Per-query savings</div>
-      <div class="mc-val" style="color:var(--green)">${fmt$(savings)} <span style="font-size:13px">(${Number(savingsPct).toFixed(0)}%)</span></div>
-      <div class="savings-wrap"><div class="savings-fill" style="width:${Math.min(Number(savingsPct) || 0, 100)}%"></div></div>
-    </div>
+    </details>` : '';
 
-    <div style="font-size:9px;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase;margin:12px 0 8px">Purchase Plan</div>
-    <div id="piList">${items||'<div style="font-size:10px;color:var(--text-muted);padding:6px 0">No paid sources needed — free sources sufficient</div>'}</div>
+  // ── Coverage gap cards ─────────────────────────────────────────────────
+  const gapCardsHtml = gaps.length ? `
+    <div style="font-size:9px;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px">Purchase plan — coverage gaps</div>
+    ${gaps.map(g => {
+      const q = g.probe.exa_quote;
+      const fetchId = 'plan-exa-' + g.index;
+      const bcPct = g.best_coverage != null ? Math.round(g.best_coverage * 100) : 0;
+      const flPct = g.quality_threshold != null ? Math.round(g.quality_threshold * 100) : 0;
+      const shortfall = flPct - bcPct;
+      return `<div id="gap-card-${g.index}" style="padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;margin-bottom:8px">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+          <span style="font-size:9px;color:var(--text-muted)">Sub-query #${g.index}</span>
+          <span id="gap-status-${g.index}" style="font-size:9px;padding:1px 6px;background:rgba(248,81,73,.12);color:var(--red);border:1px solid rgba(248,81,73,.25);border-radius:3px">GAP</span>
+        </div>
+        <div style="font-size:11px;margin-bottom:8px;line-height:1.4;color:var(--text)">${escapeHtml(g.query || '')}</div>
+        <div id="gap-cov-line-${g.index}" style="font-size:10px;color:var(--text-muted);margin-bottom:8px">Free coverage <b style="color:var(--text-dim)">${bcPct}%</b> · floor <b style="color:var(--text-dim)">${flPct}%</b> · fetch could add <b style="color:var(--green)">+${shortfall}pp</b></div>
+        <div id="gap-action-${g.index}" style="display:flex;align-items:center;gap:10px">
+          <button class="exa-fetch-btn" data-query="${escapeHtml(g.query || '')}" data-target="${fetchId}" data-sq-index="${g.index}" data-floor="${g.quality_threshold}" data-base-cov="${g.best_coverage}" style="padding:5px 14px;background:#58a6ff;color:#000;border:none;border-radius:4px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;letter-spacing:.04em">Fetch paid source ${fmt$(Number(q.total_usd || 0))} →</button>
+        </div>
+        <div id="${fetchId}" style="margin-top:8px"></div>
+      </div>`;
+    }).join('')}` : `<div style="font-size:10px;color:var(--text-muted);padding:4px 0 12px">No coverage gaps — free sources met the quality floor for all sub-queries.</div>`;
 
-    <div style="font-size:9px;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase;margin:12px 0 8px">Signal-Derived Thresholds</div>
+  // ── Projected cost ─────────────────────────────────────────────────────
+  const costHtml = `
+    <div style="font-size:9px;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px">Projected cost</div>
+    <div class="mc" style="margin-bottom:12px">
+      <div class="mc-lbl">Estimated spend to resolve gaps</div>
+      <div class="mc-val" id="exaCostDisplay" data-projected="${exaProjected}" data-all-paid="${allPaidCost}" data-n-runs="${runs.length}" style="color:var(--green)">${fmt$(exaProjected)}</div>
+      <div class="mc-sub" id="exaCostSub">${gaps.length} gap${gaps.length !== 1 ? 's' : ''} × ${fmt$(0.007)} paid fetch${gaps.length === 0 ? ' · free sources sufficient' : ''}</div>
+      <div id="exaSavingsLine" style="font-size:10px;color:var(--text-muted);margin-top:4px">${runs.length > gaps.length ? `${runs.length - gaps.length}/${runs.length} sub-queries free · ${fmt$(exaProjected)} vs ${fmt$(allPaidCost)} all-paid` : ''}</div>
+    </div>`;
+
+  // ── Signal-Derived Thresholds (with link to signals tab) ───────────────
+  const thresholdsHtml = `
+    <div style="font-size:9px;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase;margin:12px 0 6px;display:flex;align-items:center;justify-content:space-between">
+      <span>Signal-derived thresholds</span>
+      <button onclick="switchMainTab('signals')" style="background:none;border:none;color:#58a6ff;font-size:9px;cursor:pointer;padding:0;font-family:inherit;letter-spacing:.04em">→ view signals</button>
+    </div>
     <div style="background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:4px 10px">
       <div class="roi-row"><span class="rl">Quality floor</span><span class="rv">${pct(sigs.qualityThreshold != null ? sigs.qualityThreshold : 0)} <span style="color:var(--text-muted);font-size:9px">(from credibility)</span></span></div>
       <div class="roi-row"><span class="rl">Max source age</span><span class="rv">${(sigs.maxFreshnessHours != null && sigs.maxFreshnessHours>=9999)?'unlimited':(sigs.maxFreshnessHours != null ? sigs.maxFreshnessHours+'h' : '—')} <span style="color:var(--text-muted);font-size:9px">(from freshness)</span></span></div>
       <div class="roi-row"><span class="rl">Min sources</span><span class="rv">${sigs.minSources != null ? sigs.minSources : '—'} <span style="color:var(--text-muted);font-size:9px">(from corroboration)</span></span></div>
+    </div>`;
+
+  // ── Bidding tab ────────────────────────────────────────────────────────
+  // Build per-gap paywall rows: only sub-queries with a coverage gap and paywalled URLs
+  function isActualPaywall(fr) {
+    const st = (fr.rag_status || '');
+    if (st === 'skip_paywall') return true;
+    // fetch_failed:403 or fetch_failed:401 = HTTP access denied = real paywall
+    if (st.startsWith('fetch_failed:')) {
+      const reason = st.slice('fetch_failed:'.length).toLowerCase();
+      return reason.includes('403') || reason.includes('401') || reason.includes('paywall');
+    }
+    return false;
+  }
+  const paywallRuns = runs.map(r => {
+    const paywalled = (r.free_results || []).filter(isActualPaywall);
+    return { run: r, paywalled };
+  }).filter(x => x.paywalled.length > 0 || (x.run.coverage_status === 'gap' && x.run.max_price_usd));
+
+  const bidCeilStr = bid_ceiling != null ? `$${bid_ceiling.toFixed(3)}` : '—';
+  const bidCeilLabel = bid_ceiling != null ? `Value ceiling: ${bidCeilStr} <span style="font-size:9px;color:var(--text-muted)">(from stakes × credibility × freshness)</span>` : '';
+
+  const paywallCardsHtml = paywallRuns.length === 0
+    ? `<div style="color:var(--text-muted);font-size:11px;padding:12px 0">No paywalled content detected in this run.</div>`
+    : paywallRuns.map(({ run, paywalled }) => {
+        const ceil = run.max_price_usd != null ? `$${Number(run.max_price_usd).toFixed(4)}` : bidCeilStr;
+        const isGap = run.coverage_status === 'gap';
+        const chipColor = isGap ? 'var(--red)' : '#e3b341';
+        const chipLabel = isGap ? 'GAP' : 'PARTIAL';
+        const urlRows = paywalled.map(fr => {
+          const host = (() => { try { return new URL(fr.url).hostname; } catch(e) { return fr.url; } })();
+          const statusLabel = (fr.rag_status || '').startsWith('fetch_failed') ? 'paywall' : 'snippet only';
+          return `<div style="padding:5px 0;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:8px;min-width:0">
+            <div style="flex:1;min-width:0;overflow:hidden">
+              <a href="${escapeHtml(fr.url)}" target="_blank" rel="noopener" style="font-size:10px;color:var(--accent);text-decoration:none;word-break:break-all">${escapeHtml(fr.title || host)}</a>
+              <div style="font-size:9px;color:var(--text-muted);margin-top:1px">${escapeHtml(host)}</div>
+            </div>
+            <span style="flex-shrink:0;font-size:8px;padding:2px 5px;background:rgba(220,38,38,.12);color:#f87171;border:1px solid rgba(220,38,38,.25);border-radius:3px;white-space:nowrap">${statusLabel}</span>
+          </div>`;
+        }).join('');
+        return `<div style="margin-bottom:12px;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+            <span style="font-size:8px;padding:2px 5px;background:${isGap ? 'rgba(220,38,38,.12)' : 'rgba(227,179,65,.12)'};color:${chipColor};border:1px solid ${isGap ? 'rgba(220,38,38,.3)' : 'rgba(227,179,65,.3)'};border-radius:3px;font-weight:600;letter-spacing:.05em">${chipLabel}</span>
+            <span style="font-size:10px;color:var(--text-dim);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(run.query)}</span>
+            <span style="flex-shrink:0;font-size:10px;color:var(--green);font-variant-numeric:tabular-nums">ceil ${ceil}</span>
+          </div>
+          <div style="font-size:9px;color:var(--text-muted);margin-bottom:6px">${paywalled.length} blocked source${paywalled.length !== 1 ? 's' : ''}</div>
+          ${urlRows}
+        </div>`;
+      }).join('');
+
+  return `
+  <div class="fade-in">
+    <div class="right-tabs">
+      <div class="right-tab active" data-tab="plan" onclick="switchRightTab('plan')">Plan</div>
+      <div class="right-tab" data-tab="bidding" onclick="switchRightTab('bidding')">Bidding <span style="font-size:8px;padding:1px 5px;background:rgba(57,211,83,.15);color:var(--accent);border:1px solid rgba(57,211,83,.3);border-radius:3px;vertical-align:middle;letter-spacing:.05em">BETA</span></div>
     </div>
+    <div id="rightPlanContent" class="right-tab-content">
+      ${freeSourcesHtml}
+      ${gapCardsHtml}
+      ${costHtml}
+      ${thresholdsHtml}
     </div>
     <div id="rightBidContent" class="right-tab-content" style="display:none">
-      <div class="bid-ceil">${bidCeil}</div>
-      <div style="font-size:9px;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px">Bids by Source (DSP logic)</div>
-      <table class="bid-table">
-        <thead><tr><th>Source</th><th>Ask</th><th>Our bid</th><th>Decision</th></tr></thead>
-        <tbody>${bidRows}</tbody>
-      </table>
-      <div style="font-size:9px;color:var(--text-muted);margin-top:12px;line-height:1.5">Our bid = ask × (0.72 + 0.28 × utility). Buy if bid ≥ ask, else pass. Click or hover any bid for calculation details.</div>
+      ${bidCeilLabel ? `<div class="bid-ceil">${bidCeilLabel}</div>` : ''}
+      <div style="font-size:9px;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px">Paywalled content by sub-query</div>
+      ${paywallCardsHtml}
     </div>
   </div>`;
 }
@@ -1307,6 +1358,8 @@ function switchMainTab(tab, opts) {
 
 function renderDetail(res) {
   lastRightRes = res;
+  lastOptimizeRes = res;
+  exaFetchedTotal = 0;
   currentMainTab = 'signals';
   const sigs = res.sigs || {};
   const {intent, matchedTemplate} = sigs;
@@ -1402,6 +1455,47 @@ let lastOptimizeRes = null;
 let optimizeProgressTimer = null;
 let optimizeClientLogTimer = null;
 let pipelineLogDrawerOpen = false;
+let tickerTimer = null;
+let tickerLines = [];
+
+function tickerAddLine(msg) {
+  const wrap = document.getElementById('pipeTickerWrap');
+  if (!wrap) return;
+  const el = document.createElement('div');
+  el.className = 'pipe-ticker-line';
+  el.textContent = '› ' + msg;
+  wrap.appendChild(el);
+  // previous lines: remove current, add dim
+  Array.from(wrap.children).forEach(function(c, i, arr) {
+    if (i < arr.length - 1) {
+      c.classList.remove('current');
+      c.classList.add('dim');
+    }
+  });
+  requestAnimationFrame(function() {
+    el.classList.add('visible');
+    el.classList.add('current');
+    wrap.scrollTop = wrap.scrollHeight;
+  });
+}
+
+function clearTicker() {
+  const wrap = document.getElementById('pipeTickerWrap');
+  if (wrap) wrap.innerHTML = '';
+  if (tickerTimer) { clearInterval(tickerTimer); tickerTimer = null; }
+  tickerLines = [];
+}
+
+function replayLogAsTicker(entries) {
+  clearTicker();
+  let i = 0;
+  function next() {
+    if (i >= entries.length) return;
+    tickerAddLine(entries[i++].msg || '');
+    tickerTimer = setTimeout(next, 180);
+  }
+  next();
+}
 
 function pipelineLogStamp() {
   return new Date().toISOString().slice(11, 23);
@@ -1434,7 +1528,13 @@ function startOptimizeClientLog() {
   }
   resetPipelineLogUi();
   appendPipelineLogLine(null, 'POST /optimize …');
-  const hints = ['Decomposing query…', 'Signals & routing…', 'Brave search & RAG…', 'Price fetch / Valyu…', 'Plan, bids & writer…'];
+  const hints = [
+    'Decomposing query…', 'Signals & routing…', 'Generating sub-queries…',
+    'Free search & RAG…', 'Scoring hits…', 'Price fetch: probing paid sources…',
+    'Evaluating coverage gaps…', 'Building purchase plan…',
+    'Running research critic…', 'Running writer synthesis…',
+    'Formatting answer…', 'Scoring bid schedule…', 'Packaging results…',
+  ];
   let i = 0;
   optimizeClientLogTimer = setInterval(function () {
     if (i < hints.length) appendPipelineLogLine(null, hints[i++]);
@@ -1455,6 +1555,7 @@ function mergeServerPipelineLog(res) {
   pl.forEach(function (e) {
     appendPipelineLogLine(e.t, e.msg || '');
   });
+  replayLogAsTicker(pl);
 }
 
 function togglePipelineLogDrawer() {
@@ -1486,8 +1587,38 @@ function startOptimizeProgress(){
   lab.textContent = 'Starting…';
   fill.style.width = '3%';
   const t0 = Date.now();
-  const labels = ['Decomposing…', 'Signals & routing…', 'Search & RAG…', 'Price fetch & plan…', 'Finishing…'];
+  const labels = ['Decomposing…', 'Signals & routing…', 'Search & RAG…', 'Price fetch & plan…', 'Writing answer…', 'Finishing…'];
   const span = 120000;
+  clearTicker();
+  const hints = [
+    'Decomposing query into sub-tasks…',
+    'Detecting intent & routing signals…',
+    'Generating sub-queries…',
+    'Free search + RAG retrieval…',
+    'Scoring & filtering hits…',
+    'Price fetch: probing paid sources…',
+    'Evaluating coverage gaps…',
+    'Building purchase plan…',
+    'Running research critic…',
+    'Running writer synthesis…',
+    'Formatting answer…',
+    'Scoring bid schedule…',
+    'Packaging results…',
+  ];
+  // First 10 hints at 2800ms each; final 3 (finishing phase) at 3500ms each
+  const hintDelays = hints.map((_, i) => i < 10 ? 2800 : 3500);
+  let hi = 0;
+  let hintStopped = false;
+  tickerAddLine(hints[hi++]);
+  function scheduleNextHint() {
+    if (hintStopped || hi >= hints.length) return;
+    setTimeout(function() {
+      if (hintStopped) return;
+      tickerAddLine(hints[hi++]);
+      scheduleNextHint();
+    }, hintDelays[hi]);
+  }
+  scheduleNextHint();
   function tick(){
     const elapsed = Date.now() - t0;
     const pct = Math.min(97, 3 + (1 - Math.exp(-elapsed / 24000)) * 94);
@@ -1497,11 +1628,13 @@ function startOptimizeProgress(){
   }
   tick();
   optimizeProgressTimer = setInterval(tick, 320);
+  optimizeProgressTimer._stopHints = function() { hintStopped = true; };
 }
 
 /** @param {boolean} [done] If true, fill to 100% and label Done (hidden when results render). */
 function stopOptimizeProgress(done){
   if (optimizeProgressTimer){
+    if (optimizeProgressTimer._stopHints) optimizeProgressTimer._stopHints();
     clearInterval(optimizeProgressTimer);
     optimizeProgressTimer = null;
   }
@@ -1581,7 +1714,7 @@ function buildSynthesizePanelHtml(res) {
   const line = syn.summary_line != null ? String(syn.summary_line) : '';
   const body = text.trim()
     ? `<div class="answer-panel-body">${escapeHtml(text)}</div>`
-    : `<div class="fanout-nores" style="padding:8px 0">No synthesized answer text in this response (configure an OpenAI key on the server for the writer step).</div>`;
+    : `<div class="fanout-nores" style="padding:8px 0">No synthesized answer — configure an LLM API key on the server to enable the writer step.</div>`;
   return `
   <div class="fade-in">
     <div class="fanout-title" style="margin-bottom:10px">Answer <span class="fanout-badge">${escapeHtml(mode)}</span></div>
@@ -1753,7 +1886,14 @@ function init(){
     const d = document.createElement('div');
     d.className='sc-chip';
     d.innerHTML=`<div class="sc-tag">${s.tag}</div>${s.q}`;
-    d.onclick=()=>{ document.getElementById('qi').value=s.q; go(); };
+    d.onclick=()=>{
+      document.getElementById('qi').value=s.q;
+      const wrap = document.getElementById('chipsWrap');
+      const btn = document.getElementById('examplesToggle');
+      wrap.style.display = 'none';
+      btn.classList.remove('open');
+      go();
+    };
     chips.appendChild(d);
   });
   document.getElementById('qi').addEventListener('keydown',e=>{
@@ -1762,6 +1902,230 @@ function init(){
 }
 
 init();
+
+let exaFetchedTotal = 0;
+
+document.addEventListener('click', function(e) {
+  const btn = e.target.closest('.exa-fetch-btn');
+  if (btn && !btn.disabled) fetchExa(btn, btn.dataset.query, btn.dataset.target);
+});
+
+async function fetchExa(btn, query, targetId) {
+  const target = document.getElementById(targetId);
+  if (!target) return;
+
+  if (btn) { btn.disabled = true; btn.style.opacity = '0.5'; btn.style.cursor = 'default'; }
+  target.innerHTML = '<div class="fanout-nores" style="opacity:.7">Fetching paid source…</div>';
+
+  try {
+    const resp = await fetch('/fetch-exa', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({query})
+    });
+    const data = await resp.json();
+    if (data.error) {
+      if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.style.cursor = ''; }
+      target.innerHTML = `<div class="fanout-nores" style="color:var(--red)">Fetch error: ${escapeHtml(data.error)}</div>`;
+      return;
+    }
+    const results = data.results || [];
+    if (!results.length) {
+      if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.style.cursor = ''; }
+      target.innerHTML = '<div class="fanout-nores">Paid fetch returned no results for this query.</div>';
+      return;
+    }
+
+    // Capture attrs before btn is replaced
+    const sqIndex = btn ? btn.dataset.sqIndex : null;
+    const baseCov = btn ? parseFloat(btn.dataset.baseCov || 0) : 0;
+    const floor = btn ? parseFloat(btn.dataset.floor || 0) : 0;
+    const cost = data.cost_usd ?? 0.007;
+
+    // Replace button with checkmark
+    if (btn) {
+      const actionEl = document.getElementById(`gap-action-${sqIndex}`);
+      if (actionEl) actionEl.innerHTML = `<span style="display:inline-flex;align-items:center;gap:5px;color:var(--green);font-size:11px;font-weight:600">✓ Fetched paid source</span><span style="font-size:10px;opacity:.6">${fmt$(cost)} charged</span>`;
+      else btn.outerHTML = `<span style="color:var(--green);font-size:11px;font-weight:600">✓ Fetched ${fmt$(cost)}</span>`;
+    }
+
+    // Update subtotal + savings line
+    exaFetchedTotal += cost;
+    const display = document.getElementById('exaCostDisplay');
+    const sub = document.getElementById('exaCostSub');
+    const savingsLine = document.getElementById('exaSavingsLine');
+    if (display) {
+      display.textContent = fmt$(exaFetchedTotal);
+      const allPaid = parseFloat(display.dataset.allPaid || 0);
+      const nRuns = parseInt(display.dataset.nRuns || 0);
+      const saved = allPaid - exaFetchedTotal;
+      if (sub) sub.textContent = `${fmt$(exaFetchedTotal)} charged · ${Math.round(exaFetchedTotal / 0.007)} fetch${exaFetchedTotal > 0.007 ? 'es' : ''} executed`;
+      if (savingsLine && saved > 0) savingsLine.textContent = `saved ${fmt$(saved)} vs fetching all ${nRuns} sub-queries at paid rate`;
+    }
+
+    // Update gap status chip
+    if (sqIndex) {
+      // Actual best coverage from paid results; fall back to +15pp estimate
+      const bestPaidCov = results.length
+        ? Math.max(...results.map(r => parseFloat(r.coverage_score || 0)))
+        : 0;
+      const actualNewCov = Math.min(Math.max(bestPaidCov, baseCov), 1.0);
+      const gained = Math.round((actualNewCov - baseCov) * 100);
+      const floorPct = Math.round(floor * 100);
+      const basePct = Math.round(baseCov * 100);
+      const newPct = Math.round(actualNewCov * 100);
+      const gapClosed = actualNewCov >= floor;
+
+      const statusEl = document.getElementById(`gap-status-${sqIndex}`);
+      if (statusEl) {
+        if (gapClosed) {
+          statusEl.textContent = 'CLOSED';
+          statusEl.style.background = 'rgba(57,211,83,.12)';
+          statusEl.style.color = 'var(--green)';
+          statusEl.style.borderColor = 'rgba(57,211,83,.3)';
+        } else {
+          statusEl.textContent = gained > 0 ? `IMPROVED +${gained}pp` : 'IMPROVED';
+          statusEl.style.background = 'rgba(227,179,65,.12)';
+          statusEl.style.color = '#e3b341';
+          statusEl.style.borderColor = 'rgba(227,179,65,.3)';
+        }
+      }
+
+      const covLineEl = document.getElementById(`gap-cov-line-${sqIndex}`);
+      if (covLineEl) {
+        const gainColor = gapClosed ? 'var(--green)' : '#e3b341';
+        const gainLabel = gained > 0 ? `+${gained}pp` : '—';
+        covLineEl.innerHTML = `Coverage <b style="color:var(--text-dim)">${basePct}%</b> → <b style="color:${gainColor}">${newPct}%</b> · floor <b style="color:var(--text-dim)">${floorPct}%</b> · fetched <b style="color:${gainColor}">${gainLabel}</b>`;
+      }
+    }
+
+    // Build collapsible results block
+    const resultsInner = results.map(r => `
+      <div class="fanout-res">
+        <a class="fanout-res-title" href="${escapeHtml(r.url)}" target="_blank" rel="noopener">${escapeHtml(r.title || '(No title)')}</a>
+        <div class="fanout-res-meta">${escapeHtml(r.source || '—')}${r.date ? ' · ' + escapeHtml(String(r.date).slice(0,10)) : ''}</div>
+        ${r.snippet ? `<div class="fanout-res-snippet">${escapeHtml(r.snippet)}</div>` : ''}
+      </div>`).join('');
+
+    const resultsHtml = `
+      <details open style="margin-top:6px">
+        <summary style="cursor:pointer;font-size:10px;color:var(--text-muted);list-style:none;display:flex;align-items:center;gap:6px;padding:4px 0">
+          <span style="color:var(--green)">▼</span> ${results.length} paid result${results.length !== 1 ? 's' : ''} · ${fmt$(cost)} charged
+        </summary>
+        <div style="margin-top:6px">${resultsInner}</div>
+      </details>`;
+
+    // Update Plan & buy inline results
+    target.innerHTML = resultsHtml;
+
+    // Mirror results into Price fetch probe panel
+    if (sqIndex) {
+      const probeBody = document.getElementById(`probe-exa-body-${sqIndex}`);
+      if (probeBody) probeBody.innerHTML = `<div class="fanout-subhdr">Paid results — ${results.length} fetched · ${fmt$(cost)}</div>` + resultsInner;
+    }
+
+    // Re-run synthesis with paid results merged in
+    if (lastOptimizeRes) {
+      const answerPanel = document.getElementById('mtpAnswer');
+      if (answerPanel) {
+        answerPanel.innerHTML += `<div style="font-size:10px;color:var(--text-muted);padding:8px 0;opacity:.7">Re-synthesizing with paid sources…</div>`;
+      }
+      try {
+        const synResp = await fetch('/re-synthesize', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            original_query: lastOptimizeRes.query || '',
+            sub_query_runs: (lastOptimizeRes.v4 || {}).sub_query_runs || [],
+          })
+        });
+        const synData = await synResp.json();
+        if (synData.synthesis && answerPanel) {
+          // Store updated synthesis back so subsequent fetches build on it
+          if (lastOptimizeRes.v4) lastOptimizeRes.v4.synthesis = synData.synthesis;
+          answerPanel.innerHTML = buildSynthesizePanelHtml({
+            ...lastOptimizeRes,
+            v4: { ...(lastOptimizeRes.v4 || {}), synthesis: synData.synthesis }
+          });
+        }
+      } catch(e) {
+        console.warn('re-synthesize failed:', e);
+      }
+    }
+  } catch(e) {
+    if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.style.cursor = ''; }
+    target.innerHTML = `<div class="fanout-nores" style="color:var(--red)">Request failed: ${escapeHtml(String(e))}</div>`;
+  }
+}
+
+function openRagOverlay(r) {
+  const status = r.rag_status || 'unknown';
+  const isOk = status === 'ok';
+  const words = r.rag_words_fetched;
+  const chunks = r.rag_chunks_count;
+  const fetchErr = r.rag_fetch_error;
+  const ragPct = r.rag_score != null ? (r.rag_score * 100).toFixed(1) + '%' : '—';
+  const snipPct = r.snippet_score != null ? (r.snippet_score * 100).toFixed(1) + '%' : '—';
+  const covPct = r.coverage_score != null ? (r.coverage_score * 100).toFixed(1) + '%' : '—';
+
+  const reasonMap = {
+    'ok': 'Full page fetched and embedded — RAG score reflects semantic similarity across page chunks.',
+    'skip_paywall': 'This domain is on the soft-paywall skip list. The page was not fetched; scoring uses the search title and snippet only.',
+    'fetch_short': `Page was fetched but contained fewer than 200 words${words != null ? ' (' + words + ' words scraped)' : ''} — too short for reliable RAG chunking. Snippet score used.`,
+    'no_chunks': 'Page text was fetched but produced no usable chunks after splitting. Snippet score used.',
+    'embed_failed': 'Chunks were created but embedding failed (model error). Snippet score used.',
+    'not_fetched': 'Page was queued for fetch but did not complete before the pipeline deadline. Snippet score used.',
+    'no_url': 'No URL on this result — cannot fetch.',
+  };
+  let reasonText = reasonMap[status] || (status.startsWith('fetch_failed')
+    ? `HTTP fetch failed${fetchErr ? ': ' + fetchErr : ''}. Snippet score used.`
+    : 'Status: ' + status);
+
+  const rows = [
+    ['RAG status', status],
+    ['Words scraped', words != null ? words.toLocaleString() : '—'],
+    ['Chunks embedded', chunks != null ? String(chunks) : (isOk ? '—' : 'n/a')],
+    ['RAG score', ragPct],
+    ['Snippet score', snipPct],
+    ['Coverage score (used)', covPct + (!isOk ? ' ← snippet fallback' : '')],
+  ].map(([k, v]) =>
+    `<div class="rag-overlay-row"><span class="rag-overlay-k">${k}</span><span class="rag-overlay-v">${escapeHtml(String(v))}</span></div>`
+  ).join('');
+
+  const snippetBlock = (r.title || r.snippet)
+    ? `<div style="margin-top:4px">
+        <div style="font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px">Content used for snippet score</div>
+        ${r.title ? `<div style="font-size:11px;font-weight:600;color:var(--text);margin-bottom:3px">${escapeHtml(r.title)}</div>` : ''}
+        ${r.source ? `<div style="font-size:10px;color:var(--text-muted);margin-bottom:5px">${escapeHtml(r.source)}${r.date ? ' · ' + escapeHtml(r.date) : ''}</div>` : ''}
+        ${r.snippet ? `<div style="font-size:10px;color:var(--text-dim);line-height:1.55;border-left:2px solid var(--border2);padding-left:8px">${escapeHtml(r.snippet)}</div>` : ''}
+      </div>`
+    : '';
+
+  document.getElementById('ragOverlayBody').innerHTML =
+    `<div>${rows}</div>` +
+    `<div class="rag-overlay-reason${isOk ? ' ok' : ''}">${escapeHtml(reasonText)}</div>` +
+    snippetBlock;
+
+  document.getElementById('ragOverlay').classList.add('on');
+  document.getElementById('ragOverlayBackdrop').classList.add('on');
+}
+
+function closeRagOverlay() {
+  document.getElementById('ragOverlay').classList.remove('on');
+  document.getElementById('ragOverlayBackdrop').classList.remove('on');
+}
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeRagOverlay();
+});
 </script>
+<div class="rag-overlay-backdrop" id="ragOverlayBackdrop" onclick="closeRagOverlay()"></div>
+<div class="rag-overlay" id="ragOverlay" role="dialog" aria-modal="true" aria-labelledby="ragOverlayTitle">
+  <div class="rag-overlay-head">
+    <span class="rag-overlay-title" id="ragOverlayTitle">RAG fetch details</span>
+    <button class="rag-overlay-close" onclick="closeRagOverlay()" aria-label="Close">×</button>
+  </div>
+  <div class="rag-overlay-body" id="ragOverlayBody"></div>
+</div>
 </body>
 </html>

@@ -16,6 +16,45 @@ from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
+# Cosine similarity threshold above which two queries are considered near-duplicates.
+# 0.88 catches rephrases of the same facet while keeping genuinely different angles.
+_DEDUP_THRESHOLD = 0.88
+
+
+def _embed_dedup(tasks: list[dict]) -> list[dict]:
+    """Drop near-duplicate queries using cosine similarity on MiniLM embeddings.
+
+    Greedy: iterate in order, keep a task only if its similarity to every
+    already-kept task is below _DEDUP_THRESHOLD.  Falls back to the original
+    list if the embedding model is unavailable.
+    """
+    if len(tasks) <= 1:
+        return tasks
+    try:
+        from rag_coverage import _get_model  # reuse the already-warm model
+        import numpy as np
+
+        model = _get_model()
+        if model is None:
+            return tasks
+
+        queries = [t["query"] for t in tasks]
+        vecs = model.encode(queries, normalize_embeddings=True)  # shape (n, d)
+
+        kept_indices: list[int] = []
+        for i, vec in enumerate(vecs):
+            if all(float(np.dot(vec, vecs[j])) < _DEDUP_THRESHOLD for j in kept_indices):
+                kept_indices.append(i)
+            else:
+                logger.debug(
+                    "embed_dedup: dropped near-duplicate query %r", queries[i]
+                )
+
+        return [tasks[i] for i in kept_indices]
+    except Exception as e:
+        logger.debug("embed_dedup failed, skipping: %s", e)
+        return tasks
+
 
 class SearchTaskItem(BaseModel):
     """One planner task: search string, facet label, and expanded research intent (DeepReason-style)."""
@@ -43,14 +82,24 @@ FRAMEWORK_URL = "https://github.com/themiccc/deep_reasoning_researcher"
 # Mirrors nodes.planner_node intent: distinct, specific search strings for the web.
 _PLANNER_SYSTEM = """You are a research planner (DeepReason-style; see github.com/themiccc/deep_reasoning_researcher).
 Break the user's question into separate, specific web search queries that together could
-support a comprehensive answer. Each query must target one angle; avoid near-duplicates.
+support a comprehensive answer. Each query must target one distinct angle; avoid near-duplicates.
+
+CRITICAL: Do NOT use the user's original question as one of your queries - not verbatim, not
+lightly paraphrased. Decompose into different facets: specific events, underlying causes,
+impact analysis, historical context, regulatory detail, etc.
+
+DEDUPLICATION: Before finalising your task list, check every pair of queries against each other.
+If two queries would return substantially overlapping results (same topic, same time period, same
+metric — just different wording), merge them into one. A query about "net prices" and a query
+about "list price vs net price comparison" are the same facet and must be merged. Each task must
+cover a clearly different information need that the others do not address.
 
 For EVERY task you MUST provide:
-- `goal`: one short unique line — the facet label only.
-- `research_objective`: a fuller paragraph (2–6 sentences) that stands alone: what this search
-  should establish, what “good” sources would demonstrate, and how this facet supports answering
-  the user’s original question. This must NOT duplicate `goal` word-for-word — it is the expanded
-  research intent, not a second short label.
+- `goal`: one short unique line - the facet label only.
+- `research_objective`: a fuller paragraph (2-6 sentences) that stands alone: what this search
+  should establish, what sources would demonstrate, and how this facet supports answering
+  the user's original question. This must NOT duplicate `goal` word-for-word - it is the
+  expanded research intent, not a second short label.
 
 Prefer fewer queries when one search is enough; use up to the allowed maximum when the question
 truly needs multiple facets. Output only structured fields per the schema."""
@@ -101,6 +150,7 @@ def plan_search_tasks(query: str, n: int, client: Any) -> dict | None:
                     f"industry, regulatory, or trade sources where relevant."
                 )
             out_sq.append({"query": q, "goal": g[:400], "research_objective": ro[:2000]})
+        out_sq = _embed_dedup(out_sq)
         if not out_sq:
             return None
         return {
@@ -176,6 +226,7 @@ def plan_followup_tasks(
                     f"Collect evidence that, together with prior results, better answers the original question."
                 )
             out_sq.append({"query": q, "goal": g[:400], "research_objective": ro[:2000]})
+        out_sq = _embed_dedup(out_sq)
         if not out_sq:
             return None
         return {
