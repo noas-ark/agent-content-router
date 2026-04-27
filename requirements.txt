@@ -8,9 +8,8 @@ duckduckgo-search
 openai
 instructor
 pydantic
-spacy>=3.7.2,<4.0
-# English NER model (case-insensitive entities); pip installs the wheel — no separate `spacy download` step
-en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.1/en_core_web_sm-3.7.1-py3-none-any.whl
+# spaCy removed — requires blis C compilation which fails on some cloud build envs.
+# Entity extraction falls back to regex (see _get_spacy_nlp in app.py).
 sentence-transformers
 beautifulsoup4
 numpy
