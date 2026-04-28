@@ -1848,8 +1848,10 @@ async function go(){
     renderPipelineViz(res);
     totalRuns++;
     sumSavings += (res.savingsPct != null ? res.savingsPct : 0);
-    document.getElementById('totalRuns').textContent = totalRuns;
-    document.getElementById('avgSavings').textContent = Math.round(sumSavings/totalRuns)+'%';
+    const elRuns = document.getElementById('totalRuns');
+    const elAvg = document.getElementById('avgSavings');
+    if (elRuns) elRuns.textContent = totalRuns;
+    if (elAvg) elAvg.textContent = Math.round(sumSavings/totalRuns)+'%';
   } catch(err) {
     console.error(err);
     clearTimeout(abortTimer);
