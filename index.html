@@ -1822,16 +1822,39 @@ async function go(){
     const decoder = new TextDecoder();
     let buf = '';
     let res = null;
+    let keepaliveCount = 0;
+    const sseStart = Date.now();
+    console.log('[SSE] stream opened, status', resp.status);
+    appendPipelineLogLine(null, 'SSE stream opened');
     outer: while (true) {
       const { done, value } = await reader.read();
-      if (done) break;
-      buf += decoder.decode(value, { stream: true });
+      const elapsed = ((Date.now() - sseStart) / 1000).toFixed(1);
+      if (done) {
+        console.warn(`[SSE] stream closed at ${elapsed}s — keepalives received: ${keepaliveCount}, res: ${res ? 'set' : 'null'}`);
+        appendPipelineLogLine(null, `SSE stream closed at ${elapsed}s (keepalives: ${keepaliveCount})`);
+        break;
+      }
+      const chunk = decoder.decode(value, { stream: true });
+      buf += chunk;
       const lines = buf.split('\n');
       buf = lines.pop();
       for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          try { res = JSON.parse(line.slice(6)); } catch(e) {}
+        if (line.startsWith(': ')) {
+          keepaliveCount++;
+          console.log(`[SSE] keepalive #${keepaliveCount} at ${elapsed}s`);
+          appendPipelineLogLine(null, `keepalive #${keepaliveCount} (${elapsed}s elapsed)`);
+        } else if (line.startsWith('data: ')) {
+          console.log(`[SSE] data line at ${elapsed}s, length=${line.length}`);
+          appendPipelineLogLine(null, `data received at ${elapsed}s`);
+          try {
+            res = JSON.parse(line.slice(6));
+          } catch(e) {
+            console.error('[SSE] JSON parse error:', e, 'raw:', line.slice(6, 200));
+            appendPipelineLogLine(null, `JSON parse error: ${e}`);
+          }
           break outer;
+        } else if (line.trim()) {
+          console.log(`[SSE] unknown line at ${elapsed}s:`, JSON.stringify(line.slice(0, 80)));
         }
       }
     }

@@ -2237,15 +2237,26 @@ def optimize_route():
     _threading.Thread(target=_run, daemon=True, name="optimize-worker").start()
 
     def _generate():
+        import time as _time
+        t0 = _time.time()
+        ka = 0
+        app.logger.info("==> SSE generator started for query=%r", query[:60])
         while True:
             try:
                 kind, payload = result_q.get(timeout=5)
+                elapsed = round(_time.time() - t0, 1)
                 if kind == "ok":
+                    app.logger.info("==> SSE sending data (ok) after %.1fs, keepalives=%d", elapsed, ka)
                     yield f"data: {_json.dumps(payload)}\n\n"
                 else:
+                    app.logger.error("==> SSE sending error after %.1fs: %s", elapsed, payload)
                     yield f"data: {_json.dumps({'ok': False, 'error': str(payload), 'error_type': type(payload).__name__})}\n\n"
+                app.logger.info("==> SSE generator done")
                 return
             except _queue.Empty:
+                ka += 1
+                elapsed = round(_time.time() - t0, 1)
+                app.logger.info("==> SSE keepalive #%d at %.1fs", ka, elapsed)
                 yield ": keepalive\n\n"
 
     return Response(
