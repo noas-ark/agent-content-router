@@ -19,7 +19,7 @@ from urllib.parse import urlparse
 from dotenv import load_dotenv
 load_dotenv()
 
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, Response, stream_with_context
 
 from learning import ConversionEvent, get_metrics_store
 from search_provider import fetch_search_results, is_search_configured, get_search_provider_name
@@ -2181,75 +2181,81 @@ def api_reference():
 
 @app.route("/optimize", methods=["POST"])
 def optimize_route():
+    """Stream SSE keepalives while the pipeline runs, then emit the result.
+
+    Render (and most reverse proxies) time out silent connections at 30s.
+    Sending a SSE comment (': keepalive') every 5s keeps the connection alive
+    for the full pipeline duration (~60-90s).
+    """
+    import queue as _queue
+    import threading as _threading
+
     data = request.get_json() or {}
     query = data.get("query", "")
     customer_id = data.get("customer_id", "default")
     app.logger.info("==> /optimize START | query=%r | customer=%s", query[:80], customer_id)
-    try:
-        result = optimize(query, customer_id=customer_id)
-        app.logger.info("==> /optimize OK | query=%r", query[:80])
-    except Exception as e:
-        app.logger.exception("==> /optimize FAILED | query=%r | error=%s: %s", query[:80], type(e).__name__, e)
-        return (
-            jsonify(
-                {
-                    "ok": False,
-                    "error": str(e),
-                    "error_type": type(e).__name__,
-                }
-            ),
-            500,
-        )
 
-    # Articles to scrape: show every search result (no filter by purchase plan).
-    # Each result is turned into an article; catalog domains get name+price, others get domain label + "—".
-    # COMMENTED OUT: search integration
-    # result["search_configured"] = is_search_configured()
-    # result["search_provider"] = get_search_provider_name()
-    # result["selected_articles"] = []
-    # if is_search_configured():
-    #     try:
-    #         search_results, provider_used = fetch_search_results(query, num=15)
-    #         result["selected_articles"] = _search_results_to_articles(search_results)
-    #         result["search_provider"] = provider_used
-    #         if not result["selected_articles"] and search_results:
-    #             app.logger.warning(
-    #                 "Search returned %s results but 0 articles (query %r). First result keys: %s",
-    #                 len(search_results), query[:40], list(search_results[0].keys()) if search_results else None,
-    #             )
-    #         elif not result["selected_articles"]:
-    #             app.logger.info(
-    #                 "Search returned 0 results for %r (provider %s). Tip: set DSAIL_BRAVE_API_KEY (or BRAVE_API_KEY) in .env for reliable search.",
-    #                 query[:40], provider_used,
-    #             )
-    #     except Exception as e:
-    #         app.logger.warning("Search failed for %r: %s", query[:50], e)
-    result["search_configured"] = False
-    result["search_provider"] = None
-    result["selected_articles"] = []
+    result_q: _queue.Queue = _queue.Queue()
 
-    # Persist conversion event for learning (purchase decision; outcomes via /feedback)
-    event_id = str(uuid.uuid4())
-    query_id = str(uuid.uuid4())
-    selected_names = [s["name"] for s in result["selected"]]
-    avg_confidence = sum(s.get("utility", 0) for s in result["selected"]) / len(result["selected"]) if result["selected"] else 0
-    qu = result["sigs"].get("queryUnderstanding") or {}
-    event = ConversionEvent(
-        event_id=event_id,
-        query_id=query_id,
-        customer_id=customer_id,
-        query_text=query,
-        query_cluster=qu.get("query_cluster") or result["sigs"]["intent"],
-        intent=result["sigs"]["intent"],
-        sources_purchased=selected_names,
-        total_cost=result["smartCost"],
-        decision_confidence=round(avg_confidence, 4),
+    def _run():
+        try:
+            res = optimize(query, customer_id=customer_id)
+
+            res["search_configured"] = False
+            res["search_provider"] = None
+            res["selected_articles"] = []
+
+            event_id = str(uuid.uuid4())
+            query_id = str(uuid.uuid4())
+            selected_names = [s["name"] for s in res["selected"]]
+            avg_confidence = (
+                sum(s.get("utility", 0) for s in res["selected"]) / len(res["selected"])
+                if res["selected"] else 0
+            )
+            qu = res["sigs"].get("queryUnderstanding") or {}
+            event = ConversionEvent(
+                event_id=event_id,
+                query_id=query_id,
+                customer_id=customer_id,
+                query_text=query,
+                query_cluster=qu.get("query_cluster") or res["sigs"]["intent"],
+                intent=res["sigs"]["intent"],
+                sources_purchased=selected_names,
+                total_cost=res["smartCost"],
+                decision_confidence=round(avg_confidence, 4),
+            )
+            get_metrics_store().log_event(event)
+            res["event_id"] = event_id
+            res["query_id"] = query_id
+
+            app.logger.info("==> /optimize OK | query=%r", query[:80])
+            result_q.put(("ok", res))
+        except Exception as exc:
+            app.logger.exception("==> /optimize FAILED | query=%r | %s: %s", query[:80], type(exc).__name__, exc)
+            result_q.put(("error", exc))
+
+    _threading.Thread(target=_run, daemon=True, name="optimize-worker").start()
+
+    def _generate():
+        while True:
+            try:
+                kind, payload = result_q.get(timeout=5)
+                if kind == "ok":
+                    yield f"data: {_json.dumps(payload)}\n\n"
+                else:
+                    yield f"data: {_json.dumps({'ok': False, 'error': str(payload), 'error_type': type(payload).__name__})}\n\n"
+                return
+            except _queue.Empty:
+                yield ": keepalive\n\n"
+
+    return Response(
+        stream_with_context(_generate()),
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",  # disable nginx buffering on Render
+        },
     )
-    get_metrics_store().log_event(event)
-    result["event_id"] = event_id
-    result["query_id"] = query_id
-
-    return jsonify(result)
 
 
 @app.route("/feedback", methods=["POST"])
