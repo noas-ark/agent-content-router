@@ -38,9 +38,17 @@ _MODEL: Any = None
 _MODEL_FAILED = False
 
 
+def _rag_disabled() -> bool:
+    if os.environ.get("BOOTK_DISABLE_RAG", "").strip().lower() in ("1", "true", "yes"):
+        return True
+    on_render = bool(os.environ.get("RENDER", "").strip())
+    force_enable = os.environ.get("BOOTK_ENABLE_RAG", "").strip().lower() in ("1", "true", "yes")
+    return on_render and not force_enable
+
+
 def _get_model():
     global _MODEL, _MODEL_FAILED
-    if _MODEL_FAILED:
+    if _MODEL_FAILED or _rag_disabled():
         return None
     if _MODEL is not None:
         return _MODEL
@@ -55,8 +63,19 @@ def _get_model():
 
 
 def warm_embedding_model() -> None:
-    """Load the sentence-transformers model in the background so the first /optimize isn’t blocked."""
-    if os.environ.get("BOOTK_DISABLE_RAG", "").strip().lower() in ("1", "true", "yes"):
+    """Load the sentence-transformers model in the background so the first /optimize isn’t blocked.
+
+    Auto-disabled on Render free/starter tier (<=512 MB) because PyTorch alone uses ~250 MB.
+    Set BOOTK_ENABLE_RAG=1 to force-enable on a larger Render instance (>=1 GB RAM).
+    Set BOOTK_DISABLE_RAG=1 to force-disable anywhere.
+    """
+    disable = os.environ.get("BOOTK_DISABLE_RAG", "").strip().lower() in ("1", "true", "yes")
+    if disable:
+        return
+    # On Render, skip unless the operator explicitly opts in — 512 MB is not enough for PyTorch.
+    on_render = bool(os.environ.get("RENDER", "").strip())
+    force_enable = os.environ.get("BOOTK_ENABLE_RAG", "").strip().lower() in ("1", "true", "yes")
+    if on_render and not force_enable:
         return
     _get_model()
 
