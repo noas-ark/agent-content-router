@@ -2331,6 +2331,8 @@ def fetch_exa_route():
     signals = _infer_signals(sub_query, "")
     result = _exa_fetch(sub_query, signals, n_results=EXA_DEFAULT_RESULTS)
     if not result.get("error") and result.get("results"):
+        for r in result["results"]:
+            r["coverage_score"] = _snippet_coverage_score(r, signals)
         _exa_result_cache[sub_query] = {
             "results": result["results"],
             "cost_usd": result.get("cost_usd", 0),
