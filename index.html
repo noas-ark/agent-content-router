@@ -1807,6 +1807,8 @@ async function go(){
   const ac = new AbortController();
   const abortTimer = setTimeout(() => ac.abort(), OPTIMIZE_FETCH_TIMEOUT_MS);
   try {
+    // POST to /optimize returns a job_id immediately (pipeline runs in background).
+    // We then poll /job/<id> every 3s until status=="done".
     const resp = await fetch('/optimize', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
@@ -1815,50 +1817,28 @@ async function go(){
     });
     clearTimeout(abortTimer);
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const { job_id } = await resp.json();
+    if (!job_id) throw new Error('No job_id in response');
+    console.log('[poll] job started:', job_id);
+    appendPipelineLogLine(null, `job started: ${job_id.slice(0, 8)}…`);
 
-    // Read SSE stream — server sends ": keepalive" comments every 5s to prevent
-    // proxy timeouts, then a single "data: {...}" line with the full result.
-    const reader = resp.body.getReader();
-    const decoder = new TextDecoder();
-    let buf = '';
+    // Poll until done or error, up to OPTIMIZE_FETCH_TIMEOUT_MS total.
     let res = null;
-    let keepaliveCount = 0;
-    const sseStart = Date.now();
-    console.log('[SSE] stream opened, status', resp.status);
-    appendPipelineLogLine(null, 'SSE stream opened');
-    outer: while (true) {
-      const { done, value } = await reader.read();
-      const elapsed = ((Date.now() - sseStart) / 1000).toFixed(1);
-      if (done) {
-        console.warn(`[SSE] stream closed at ${elapsed}s — keepalives received: ${keepaliveCount}, res: ${res ? 'set' : 'null'}`);
-        appendPipelineLogLine(null, `SSE stream closed at ${elapsed}s (keepalives: ${keepaliveCount})`);
-        break;
-      }
-      const chunk = decoder.decode(value, { stream: true });
-      buf += chunk;
-      const lines = buf.split('\n');
-      buf = lines.pop();
-      for (const line of lines) {
-        if (line.startsWith(': ')) {
-          keepaliveCount++;
-          console.log(`[SSE] keepalive #${keepaliveCount} at ${elapsed}s`);
-          appendPipelineLogLine(null, `keepalive #${keepaliveCount} (${elapsed}s elapsed)`);
-        } else if (line.startsWith('data: ')) {
-          console.log(`[SSE] data line at ${elapsed}s, length=${line.length}`);
-          appendPipelineLogLine(null, `data received at ${elapsed}s`);
-          try {
-            res = JSON.parse(line.slice(6));
-          } catch(e) {
-            console.error('[SSE] JSON parse error:', e, 'raw:', line.slice(6, 200));
-            appendPipelineLogLine(null, `JSON parse error: ${e}`);
-          }
-          break outer;
-        } else if (line.trim()) {
-          console.log(`[SSE] unknown line at ${elapsed}s:`, JSON.stringify(line.slice(0, 80)));
-        }
-      }
+    const pollDeadline = Date.now() + OPTIMIZE_FETCH_TIMEOUT_MS;
+    let pollCount = 0;
+    while (Date.now() < pollDeadline) {
+      await new Promise(r => setTimeout(r, 3000));
+      pollCount++;
+      const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
+      const pr = await fetch(`/job/${job_id}`);
+      if (!pr.ok) { console.warn('[poll] /job returned', pr.status); continue; }
+      const pj = await pr.json();
+      console.log(`[poll] #${pollCount} at ${elapsed}s — status: ${pj.status}`);
+      appendPipelineLogLine(null, `poll #${pollCount} (${elapsed}s) — ${pj.status}`);
+      if (pj.status === 'done') { res = pj.result; break; }
+      if (pj.status === 'error') throw new Error(pj.error || 'Pipeline error');
     }
-    if (!res) throw new Error('Empty response from server');
+    if (!res) throw new Error('Timed out waiting for pipeline result');
     if (res.ok === false && res.error) throw new Error(String(res.error));
     stopOptimizeProgress(true);
     const elapsed = Date.now() - startedAt;

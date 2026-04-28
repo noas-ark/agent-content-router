@@ -63,6 +63,26 @@ def _start_rag_model_warm() -> None:
     threading.Thread(target=_run, daemon=True, name="bootk-rag-warm").start()
 
 
+# ---------------------------------------------------------------------------
+# Background-job store for /optimize polling
+# Key: job_id (str UUID), Value: {"status": "running"|"done"|"error",
+#                                  "result": dict|None, "error": str|None,
+#                                  "started_at": float}
+# Jobs older than JOB_TTL_S are pruned on each new submission.
+# ---------------------------------------------------------------------------
+_JOB_STORE: dict = {}
+_JOB_STORE_LOCK = threading.Lock()
+_JOB_TTL_S = 600  # 10 minutes
+
+
+def _prune_old_jobs() -> None:
+    cutoff = time.time() - _JOB_TTL_S
+    with _JOB_STORE_LOCK:
+        stale = [k for k, v in _JOB_STORE.items() if v.get("started_at", 0) < cutoff]
+        for k in stale:
+            del _JOB_STORE[k]
+
+
 _start_rag_model_warm()
 
 # ═══════════════════════════════════════════════════════════════
@@ -2181,21 +2201,23 @@ def api_reference():
 
 @app.route("/optimize", methods=["POST"])
 def optimize_route():
-    """Stream SSE keepalives while the pipeline runs, then emit the result.
+    """Start the pipeline in a background thread and return a job ID immediately.
 
-    Render (and most reverse proxies) time out silent connections at 30s.
-    Sending a SSE comment (': keepalive') every 5s keeps the connection alive
-    for the full pipeline duration (~60-90s).
+    Render (and most reverse proxies) time out requests that don't respond within
+    30 seconds. The pipeline takes 60-90s, so we return {job_id} in <1s and let
+    the frontend poll /job/<id> every 3 seconds until status=="done".
     """
-    import queue as _queue
-    import threading as _threading
+    _prune_old_jobs()
 
     data = request.get_json() or {}
     query = data.get("query", "")
     customer_id = data.get("customer_id", "default")
-    app.logger.info("==> /optimize START | query=%r | customer=%s", query[:80], customer_id)
+    job_id = str(uuid.uuid4())
 
-    result_q: _queue.Queue = _queue.Queue()
+    app.logger.info("==> /optimize START | job=%s | query=%r | customer=%s", job_id, query[:80], customer_id)
+
+    with _JOB_STORE_LOCK:
+        _JOB_STORE[job_id] = {"status": "running", "result": None, "error": None, "started_at": time.time()}
 
     def _run():
         try:
@@ -2228,45 +2250,39 @@ def optimize_route():
             res["event_id"] = event_id
             res["query_id"] = query_id
 
-            app.logger.info("==> /optimize OK | query=%r", query[:80])
-            result_q.put(("ok", res))
+            app.logger.info("==> /optimize OK | job=%s | query=%r", job_id, query[:80])
+            with _JOB_STORE_LOCK:
+                if job_id in _JOB_STORE:
+                    _JOB_STORE[job_id]["status"] = "done"
+                    _JOB_STORE[job_id]["result"] = res
         except Exception as exc:
-            app.logger.exception("==> /optimize FAILED | query=%r | %s: %s", query[:80], type(exc).__name__, exc)
-            result_q.put(("error", exc))
+            app.logger.exception("==> /optimize FAILED | job=%s | %s: %s", job_id, type(exc).__name__, exc)
+            with _JOB_STORE_LOCK:
+                if job_id in _JOB_STORE:
+                    _JOB_STORE[job_id]["status"] = "error"
+                    _JOB_STORE[job_id]["error"] = f"{type(exc).__name__}: {exc}"
 
-    _threading.Thread(target=_run, daemon=True, name="optimize-worker").start()
+    threading.Thread(target=_run, daemon=True, name=f"optimize-{job_id[:8]}").start()
+    return jsonify({"job_id": job_id, "status": "running"})
 
-    def _generate():
-        import time as _time
-        t0 = _time.time()
-        ka = 0
-        app.logger.info("==> SSE generator started for query=%r", query[:60])
-        while True:
-            try:
-                kind, payload = result_q.get(timeout=5)
-                elapsed = round(_time.time() - t0, 1)
-                if kind == "ok":
-                    app.logger.info("==> SSE sending data (ok) after %.1fs, keepalives=%d", elapsed, ka)
-                    yield f"data: {_json.dumps(payload)}\n\n"
-                else:
-                    app.logger.error("==> SSE sending error after %.1fs: %s", elapsed, payload)
-                    yield f"data: {_json.dumps({'ok': False, 'error': str(payload), 'error_type': type(payload).__name__})}\n\n"
-                app.logger.info("==> SSE generator done")
-                return
-            except _queue.Empty:
-                ka += 1
-                elapsed = round(_time.time() - t0, 1)
-                app.logger.info("==> SSE keepalive #%d at %.1fs", ka, elapsed)
-                yield ": keepalive\n\n"
 
-    return Response(
-        stream_with_context(_generate()),
-        mimetype="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "X-Accel-Buffering": "no",  # disable nginx buffering on Render
-        },
-    )
+@app.route("/job/<job_id>", methods=["GET"])
+def job_status(job_id):
+    """Poll endpoint. Returns {status, result?, error?} for a background optimize job."""
+    with _JOB_STORE_LOCK:
+        job = _JOB_STORE.get(job_id)
+    if job is None:
+        return jsonify({"status": "not_found"}), 404
+    if job["status"] == "running":
+        elapsed = round(time.time() - job.get("started_at", time.time()), 1)
+        app.logger.debug("==> /job/%s running (%.1fs)", job_id[:8], elapsed)
+        return jsonify({"status": "running", "elapsed": elapsed})
+    if job["status"] == "error":
+        app.logger.info("==> /job/%s error: %s", job_id[:8], job.get("error"))
+        return jsonify({"status": "error", "error": job.get("error", "unknown error")})
+    # done
+    app.logger.info("==> /job/%s done", job_id[:8])
+    return jsonify({"status": "done", "result": job["result"]})
 
 
 @app.route("/feedback", methods=["POST"])

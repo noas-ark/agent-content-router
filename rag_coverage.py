@@ -61,7 +61,9 @@ def _get_model():
     try:
         from sentence_transformers import SentenceTransformer
 
-        _MODEL = SentenceTransformer("all-MiniLM-L6-v2")
+        # Force CPU — avoids MPS/Metal assertion crashes on macOS when the
+        # Metal compiler service is unavailable, and keeps memory predictable.
+        _MODEL = SentenceTransformer("all-MiniLM-L6-v2", device="cpu")
         return _MODEL
     except Exception:
         _MODEL_FAILED = True
