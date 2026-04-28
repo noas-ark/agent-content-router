@@ -96,7 +96,10 @@ def fetch_duckduckgo(query: str, num: int = 10) -> List[Dict[str, Any]]:
         for attempt in range(2):
             try:
                 client = DDGS()
-                results = client.text(query, max_results=num, backend="auto")
+                # "html" hits only DuckDuckGo (one request).
+                # "auto" fans out to Yahoo/Yandex/Wikipedia simultaneously — too many
+                # concurrent TLS browser-emulated connections → OOM on 512MB hosts.
+                results = client.text(query, max_results=num, backend="html")
                 if results is None:
                     results = []
                 results = list(results) if not isinstance(results, list) else results

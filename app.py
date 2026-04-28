@@ -41,7 +41,7 @@ MAX_VALYU_PROBES_PER_REQUEST = max(1, int(os.environ.get("MAX_VALYU_PROBES_PER_R
 # Max total fanout rounds (1 = no re-fanout; 2 = one follow-up round if critic says need_more).
 MAX_REFANOUT_ROUNDS = max(1, int(os.environ.get("MAX_REFANOUT_ROUNDS", "2")))
 # Brave Web Search API allows up to 20 results per request; was previously hard-coded to 5.
-BRAVE_WEB_RESULT_COUNT = max(1, min(20, int(os.environ.get("BRAVE_WEB_RESULT_COUNT", "20"))))
+BRAVE_WEB_RESULT_COUNT = max(1, min(20, int(os.environ.get("BRAVE_WEB_RESULT_COUNT", "10"))))
 COVERAGE_GAP_POLICY = (
     "A sub-query is in 'gap' when the highest free-hit relevance score is below that "
     "sub-query's quality floor (from signals). Relevance = max(RAG max-chunk similarity, "
