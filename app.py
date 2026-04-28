@@ -1,5 +1,8 @@
 import logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+)
 import math
 import os
 import random
@@ -1831,12 +1834,15 @@ The report should be comprehensive yet concise, focusing on the most relevant in
 
 def optimize(query, customer_id="default"):
     deadline = time.time() + MAX_OPTIMIZE_SECONDS
+    logger.info("optimize START | query=%r", query[:80])
 
     # --- Round 1: plan ---
     _n_queries = _query_complexity(query)
+    logger.info("optimize | complexity=%d", _n_queries)
     _decomp = _decompose_query(query, n=_n_queries)
     sub_queries = _decomp.get("sub_queries") or []
     query_fan_out_rationale = (_decomp.get("rationale") or "").strip()
+    logger.info("optimize | sub_queries=%d: %s", len(sub_queries), [sq["query"][:50] for sq in sub_queries])
 
     # Accumulated state across all fanout rounds
     sq_with_signals: list = []
@@ -1846,9 +1852,11 @@ def optimize(query, customer_id="default"):
     all_candidates: list = []
 
     # --- Round 1: fanout ---
+    logger.info("optimize | round 1 fanout START")
     r_sq, r_free, r_probe, r_prov, valyu_probes_used = _run_fanout_round(
         sub_queries, deadline, 0
     )
+    logger.info("optimize | round 1 fanout DONE | results=%d", sum(len(v) for v in r_free.values()))
     sq_with_signals.extend(r_sq)
     free_results.update(r_free)
     probe_results.update(r_probe)
@@ -2010,14 +2018,22 @@ def optimize(query, customer_id="default"):
     n_subq_processed = len(sq_with_signals)
     n_subq_planned = len(sub_queries)
 
+    logger.info("optimize | building sub_query_runs")
     sub_query_runs = _build_sub_query_runs(sq_with_signals, free_results, probe_results, search_providers)
+    logger.info("optimize | sub_query_runs=%d | gaps=%d | ok=%d",
+        len(sub_query_runs),
+        sum(1 for r in sub_query_runs if r.get("coverage_status") == "gap"),
+        sum(1 for r in sub_query_runs if r.get("coverage_status") == "ok"),
+    )
 
+    logger.info("optimize | building research digest")
     digest = _build_research_digest(sub_query_runs)
     mean_best = (
         sum(r.get("best_coverage", 0) or 0 for r in sub_query_runs) / len(sub_query_runs)
         if sub_query_runs
         else 0.0
     )
+    logger.info("optimize | evaluating research completeness | mean_best=%.3f", mean_best)
     research_completeness = evaluate_research_completeness(
         query,
         digest,
@@ -2031,9 +2047,17 @@ def optimize(query, customer_id="default"):
             "mean_best_relevance": mean_best,
         },
     )
+    logger.info("optimize | research_completeness=%s need_more=%s",
+        research_completeness.get("completeness_percent"),
+        research_completeness.get("need_more_information"),
+    )
 
+    logger.info("optimize | running writer synthesis")
     writer_research_data = _build_deepreason_writer_research_data(sub_query_runs)
     synthesis = _synthesize_research_answer(query, writer_research_data, _instructor_client())
+    logger.info("optimize | synthesis done | mode=%s | text_len=%d",
+        synthesis.get("mode"), len(synthesis.get("text") or "")
+    )
 
     # Visualizable pipeline log (timestamps are synthetic spacing for readability)
     _tick = [0]
@@ -2160,10 +2184,12 @@ def optimize_route():
     data = request.get_json() or {}
     query = data.get("query", "")
     customer_id = data.get("customer_id", "default")
+    app.logger.info("==> /optimize START | query=%r | customer=%s", query[:80], customer_id)
     try:
         result = optimize(query, customer_id=customer_id)
+        app.logger.info("==> /optimize OK | query=%r", query[:80])
     except Exception as e:
-        app.logger.exception("optimize failed")
+        app.logger.exception("==> /optimize FAILED | query=%r | error=%s: %s", query[:80], type(e).__name__, e)
         return (
             jsonify(
                 {
