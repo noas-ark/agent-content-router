@@ -38,14 +38,26 @@ _MODEL: Any = None
 _MODEL_FAILED = False
 
 
+def _embedding_allowed() -> bool:
+    """Return True only when the embedding model should be loaded.
+
+    Blocked on Render (RENDER env is set automatically) because PyTorch alone uses ~300 MB,
+    which reliably exceeds the 512 MB free-tier limit. Set BOOTK_ENABLE_RAG=1 on a larger
+    instance (>=1 GB) to re-enable. Set BOOTK_DISABLE_RAG=1 to force-disable anywhere.
+    """
+    if os.environ.get("BOOTK_DISABLE_RAG", "").strip().lower() in ("1", "true", "yes"):
+        return False
+    if os.environ.get("RENDER", "").strip():
+        return os.environ.get("BOOTK_ENABLE_RAG", "").strip().lower() in ("1", "true", "yes")
+    return True
+
+
 def _get_model():
     global _MODEL, _MODEL_FAILED
-    if _MODEL_FAILED:
+    if _MODEL_FAILED or not _embedding_allowed():
         return None
     if _MODEL is not None:
         return _MODEL
-    if os.environ.get("BOOTK_DISABLE_RAG", "").strip().lower() in ("1", "true", "yes"):
-        return None
     try:
         from sentence_transformers import SentenceTransformer
 
@@ -57,17 +69,9 @@ def _get_model():
 
 
 def warm_embedding_model() -> None:
-    """Load the sentence-transformers model in the background so the first /optimize isn’t blocked.
-
-    Skipped on startup when BOOTK_DISABLE_RAG=1 or when running on Render (RENDER env set) —
-    512 MB free tier can’t hold PyTorch at idle. The model loads lazily on first /optimize instead.
-    """
-    if os.environ.get("BOOTK_DISABLE_RAG", "").strip().lower() in ("1", "true", "yes"):
-        return
-    # Don’t warm on Render — let it load lazily on first request to avoid idle OOM.
-    if os.environ.get("RENDER", "").strip():
-        return
-    _get_model()
+    """Pre-load the embedding model. No-op when embeddings are disabled."""
+    if _embedding_allowed():
+        _get_model()
 
 
 def host_paywalled(url: str) -> bool:
