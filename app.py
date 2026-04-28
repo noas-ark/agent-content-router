@@ -2187,6 +2187,11 @@ def optimize(query, customer_id="default"):
 # ═══════════════════════════════════════════════════════════════
 
 @app.route("/")
+def home():
+    return send_from_directory(".", "home.html")
+
+
+@app.route("/playground")
 def index():
     return send_from_directory(".", "index.html")
 
