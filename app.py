@@ -41,6 +41,7 @@ MAX_OPTIMIZE_SECONDS = float(os.environ.get("MAX_OPTIMIZE_SECONDS", "90"))
 WRITER_TIMEOUT_SECONDS = float(os.environ.get("WRITER_TIMEOUT_SECONDS", "120"))
 JOB_POLL_BUFFER_SECONDS = float(os.environ.get("JOB_POLL_BUFFER_SECONDS", "45"))
 MAX_JOB_WAIT_SECONDS = MAX_OPTIMIZE_SECONDS + WRITER_TIMEOUT_SECONDS + JOB_POLL_BUFFER_SECONDS
+QUALITY_FLOOR = float(os.environ.get("QUALITY_FLOOR", "0.72"))
 # One Valyu tier-diff probe per gap by default (up to this many per /optimize).
 MAX_VALYU_PROBES_PER_REQUEST = max(1, int(os.environ.get("MAX_VALYU_PROBES_PER_REQUEST", "5")))
 # Max total fanout rounds (1 = no re-fanout; 2 = one follow-up round if critic says need_more).
@@ -726,7 +727,7 @@ def _infer_signals_local(query: str, goal: str) -> dict:
         domain = "general"
     complexity_score = min(1.0, (len(query.split()) + len(goal.split())) / 28)
     requires_freshness = "news" in keyword_hits
-    quality_threshold = 0.9 if intent in ("prior_art", "regulatory") else (0.85 if intent in ("analysis", "breaking_news") else 0.85)
+    quality_threshold = QUALITY_FLOOR
     content_type_needed = (
         "news_article" if intent == "breaking_news"
         else "regulatory_doc" if intent == "regulatory"
@@ -998,7 +999,7 @@ def _infer_signals(query: str, goal: str) -> dict:
             "intent_template": model_out.intent_template,
             "requires_freshness": bool(model_out.requires_freshness),
             "content_type_needed": model_out.content_type_needed,
-            "quality_threshold": max(0.85, min(1.0, float(model_out.quality_threshold))),
+            "quality_threshold": max(QUALITY_FLOOR, min(1.0, float(model_out.quality_threshold))),
         }
         return signals
     except Exception:
@@ -1537,13 +1538,7 @@ def _run_fanout_round(
         # free news results; 0.72 lets those pass while niche/proprietary content
         # (scores ~0.30-0.68) still triggers Exa. RAG scores peak slightly higher
         # (~0.75-0.85), so cap at 0.75 for that path.
-        from rag_coverage import _get_model
-        _rag_active = _get_model() is not None
-        if not _rag_active:
-            signals["quality_threshold"] = 0.72
-        else:
-            _cap = 0.75
-            signals["quality_threshold"] = min(signals.get("quality_threshold", _cap), _cap)
+        signals["quality_threshold"] = QUALITY_FLOOR
         sq_with_signals.append((sq, signals))
         provider_used = "Brave"
         free = _brave_search(sq_query, count=BRAVE_WEB_RESULT_COUNT)
