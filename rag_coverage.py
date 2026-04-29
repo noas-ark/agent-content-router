@@ -1,7 +1,11 @@
 """
 RAG-style coverage for free search hits: fetch public HTML, chunk, embed with
-all-MiniLM-L6-v2, max cosine vs sub-query embedding. Falls back to snippet_score
-when fetch fails, paywall skip, or content too short.
+OpenAI text-embedding-3-small (API call, zero local memory), max cosine vs
+sub-query embedding. Falls back to snippet_score when fetch fails, paywall
+skip, or content too short.
+
+Requires OPENAI_API_KEY env var. If unset, RAG is disabled and snippet scores
+are used directly — same behaviour as before but without the PyTorch footprint.
 """
 
 from __future__ import annotations
@@ -34,46 +38,51 @@ MAX_CHUNKS_PER_URL = 10
 FETCH_TIMEOUT = 8.0
 MAX_BYTES = 2_000_000
 
-_MODEL: Any = None
-_MODEL_FAILED = False
+OPENAI_EMBED_MODEL = "text-embedding-3-small"
+OPENAI_EMBED_BATCH = 64  # max texts per API call
 
-
-def _embedding_allowed() -> bool:
-    """Return True only when the embedding model should be loaded.
-
-    Blocked on Render (RENDER env is set automatically) because PyTorch alone uses ~300 MB,
-    which reliably exceeds the 512 MB free-tier limit. Set BOOTK_ENABLE_RAG=1 on a larger
-    instance (>=1 GB) to re-enable. Set BOOTK_DISABLE_RAG=1 to force-disable anywhere.
-    """
-    if os.environ.get("BOOTK_DISABLE_RAG", "").strip().lower() in ("1", "true", "yes"):
-        return False
-    if os.environ.get("RENDER", "").strip():
-        return os.environ.get("BOOTK_ENABLE_RAG", "").strip().lower() in ("1", "true", "yes")
-    return True
+_CLIENT: Any = None
+_CLIENT_FAILED = False
 
 
 def _get_model():
-    global _MODEL, _MODEL_FAILED
-    if _MODEL_FAILED or not _embedding_allowed():
-        return None
-    if _MODEL is not None:
-        return _MODEL
-    try:
-        from sentence_transformers import SentenceTransformer
+    """Return an OpenAI client if OPENAI_API_KEY is set, else None.
 
-        # Force CPU — avoids MPS/Metal assertion crashes on macOS when the
-        # Metal compiler service is unavailable, and keeps memory predictable.
-        _MODEL = SentenceTransformer("all-MiniLM-L6-v2", device="cpu")
-        return _MODEL
+    Named _get_model() for compatibility with app.py callers that check
+    `_get_model() is not None` to decide whether RAG is active.
+    """
+    global _CLIENT, _CLIENT_FAILED
+    if _CLIENT_FAILED:
+        return None
+    if _CLIENT is not None:
+        return _CLIENT
+    if os.environ.get("BOOTK_DISABLE_RAG", "").strip().lower() in ("1", "true", "yes"):
+        return None
+    api_key = (os.environ.get("OPENAI_API_KEY") or os.environ.get("DSAIL_OPENAI_API_KEY") or "").strip()
+    if not api_key:
+        return None
+    try:
+        from openai import OpenAI
+        _CLIENT = OpenAI(api_key=api_key)
+        return _CLIENT
     except Exception:
-        _MODEL_FAILED = True
+        _CLIENT_FAILED = True
         return None
 
 
 def warm_embedding_model() -> None:
-    """Pre-load the embedding model. No-op when embeddings are disabled."""
-    if _embedding_allowed():
-        _get_model()
+    """No-op for API-based embeddings — no local model to pre-load."""
+    client = _get_model()
+    if client is not None:
+        import logging
+        logging.getLogger(__name__).info(
+            "RAG embeddings: OpenAI %s ready", OPENAI_EMBED_MODEL
+        )
+    else:
+        import logging
+        logging.getLogger(__name__).info(
+            "RAG embeddings: disabled (OPENAI_API_KEY not set or BOOTK_DISABLE_RAG=1)"
+        )
 
 
 def host_paywalled(url: str) -> bool:
@@ -171,6 +180,27 @@ def effective_coverage(r: Dict[str, Any]) -> float:
     return max(float(rs), ss)
 
 
+def _openai_embed(client: Any, texts: List[str]) -> List[List[float]]:
+    """Embed a list of texts via OpenAI API, batching if needed."""
+    all_embeddings: List[List[float]] = []
+    for i in range(0, len(texts), OPENAI_EMBED_BATCH):
+        batch = texts[i : i + OPENAI_EMBED_BATCH]
+        resp = client.embeddings.create(input=batch, model=OPENAI_EMBED_MODEL)
+        # resp.data is sorted by index
+        all_embeddings.extend([item.embedding for item in resp.data])
+    return all_embeddings
+
+
+def _cosine(a: List[float], b: List[float]) -> float:
+    import math
+    dot = sum(x * y for x, y in zip(a, b))
+    norm_a = math.sqrt(sum(x * x for x in a))
+    norm_b = math.sqrt(sum(x * x for x in b))
+    if norm_a == 0 or norm_b == 0:
+        return 0.0
+    return dot / (norm_a * norm_b)
+
+
 def enrich_free_results_with_rag(
     results: List[Dict[str, Any]],
     sub_query: str,
@@ -185,8 +215,8 @@ def enrich_free_results_with_rag(
             r["coverage_score"] = effective_coverage(r)
         return
 
-    model = _get_model()
-    if model is None:
+    client = _get_model()
+    if client is None:
         for r in results:
             r["coverage_score"] = effective_coverage(r)
         return
@@ -252,23 +282,24 @@ def enrich_free_results_with_rag(
         return
 
     try:
-        import numpy as np
+        all_texts = [sub_query] + flat_chunks
+        all_embeddings = _openai_embed(client, all_texts)
+        emb_q = all_embeddings[0]
+        emb_chunks = all_embeddings[1:]
 
-        emb_q = model.encode([sub_query], normalize_embeddings=True, show_progress_bar=False)
-        emb_c = model.encode(flat_chunks, normalize_embeddings=True, show_progress_bar=False)
-        sims = np.dot(emb_c, emb_q.T).flatten()
         max_per: Dict[int, float] = defaultdict(float)
         for row, res_idx in enumerate(chunk_meta):
-            max_per[res_idx] = max(max_per[res_idx], cosine_to_unit(float(sims[row])))
+            sim = cosine_to_unit(_cosine(emb_chunks[row], emb_q))
+            max_per[res_idx] = max(max_per[res_idx], sim)
         for i, r in enumerate(results):
             if i in max_per:
                 r["rag_score"] = round(max_per[i], 4)
                 r["rag_status"] = "ok"
-    except Exception:
+    except Exception as e:
         for i in set(chunk_meta):
             if 0 <= i < len(results):
                 results[i]["rag_score"] = None
-                results[i]["rag_status"] = "embed_failed"
+                results[i]["rag_status"] = f"embed_failed:{str(e)[:80]}"
 
     for r in results:
         r["coverage_score"] = round(effective_coverage(r), 4)
