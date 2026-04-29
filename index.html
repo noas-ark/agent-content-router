@@ -1770,6 +1770,8 @@ function showOptimizeFailed(message, hintKind){
   let hint = '';
   if (hintKind === 'network' || /^failed to fetch$/i.test(m) || /load failed|networkerror/i.test(m)) {
     hint = 'The browser could not reach the app. Start the server (e.g. <code style="font-size:9px">python app.py</code> or gunicorn), open this page from that origin (not <code style="font-size:9px">file://</code>), and use the same host/port as the API.';
+  } else if (hintKind === 'interrupted') {
+    hint = 'The server likely restarted while the pipeline was running, so background job state was lost. Retry Optimize now; if this repeats on Render, avoid restarting during runs or move job state to shared storage (Redis/DB queue).';
   } else if (hintKind === 'timeout') {
     hint = 'First run can be slow while the embedding model downloads. Set <code style="font-size:9px">BOOTK_DISABLE_RAG=1</code> in <code style="font-size:9px">.env</code> for snippet-only scoring until the model is cached, then retry.';
   } else {
@@ -1815,14 +1817,18 @@ async function go(){
     });
     clearTimeout(abortTimer);
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    const { job_id } = await resp.json();
+    const payload = await resp.json();
+    const job_id = payload && payload.job_id;
+    const pollTimeoutMs = Number(payload && payload.poll_timeout_ms) > 0
+      ? Number(payload.poll_timeout_ms)
+      : OPTIMIZE_FETCH_TIMEOUT_MS;
     if (!job_id) throw new Error('No job_id in response');
     console.log('[poll] job started:', job_id);
     appendPipelineLogLine(null, `job started: ${job_id.slice(0, 8)}…`);
 
     // Poll until done or error, up to OPTIMIZE_FETCH_TIMEOUT_MS total.
     let res = null;
-    const pollDeadline = Date.now() + OPTIMIZE_FETCH_TIMEOUT_MS;
+    const pollDeadline = Date.now() + pollTimeoutMs;
     let pollCount = 0;
     while (Date.now() < pollDeadline) {
       await new Promise(r => setTimeout(r, 3000));
@@ -1855,10 +1861,16 @@ async function go(){
     clearTimeout(abortTimer);
     const isAbort = err && err.name === 'AbortError';
     const raw = (err && err.message) ? String(err.message) : 'Optimize failed.';
+    const isInterrupted = /interrupted by worker restart|exceeded max wait/i.test(raw);
     let msg = isAbort
       ? 'Request timed out after ' + (OPTIMIZE_FETCH_TIMEOUT_MS / 1000) + 's. The server may still be working (RAG fetches + embeddings). Try again, or set BOOTK_DISABLE_RAG=1 while the embedding model downloads.'
       : raw;
-    const hintKind = isAbort ? 'timeout' : (/failed to fetch/i.test(raw) ? 'network' : 'generic');
+    if (isInterrupted) {
+      msg = 'Pipeline was interrupted by a server restart while running. Please retry.';
+    }
+    const hintKind = isAbort
+      ? 'timeout'
+      : (isInterrupted ? 'interrupted' : (/failed to fetch/i.test(raw) ? 'network' : 'generic'));
     showOptimizeFailed(msg, hintKind);
   }
   finally {

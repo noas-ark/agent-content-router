@@ -36,6 +36,9 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 MAX_OPTIMIZE_SECONDS = float(os.environ.get("MAX_OPTIMIZE_SECONDS", "90"))
+WRITER_TIMEOUT_SECONDS = float(os.environ.get("WRITER_TIMEOUT_SECONDS", "120"))
+JOB_POLL_BUFFER_SECONDS = float(os.environ.get("JOB_POLL_BUFFER_SECONDS", "45"))
+MAX_JOB_WAIT_SECONDS = MAX_OPTIMIZE_SECONDS + WRITER_TIMEOUT_SECONDS + JOB_POLL_BUFFER_SECONDS
 # One Valyu tier-diff probe per gap by default (up to this many per /optimize).
 MAX_VALYU_PROBES_PER_REQUEST = max(1, int(os.environ.get("MAX_VALYU_PROBES_PER_REQUEST", "5")))
 # Max total fanout rounds (1 = no re-fanout; 2 = one follow-up round if critic says need_more).
@@ -1738,7 +1741,7 @@ The report should be comprehensive yet concise, focusing on the most relevant in
             response_model=ResearchWriterOutput,
             messages=[{"role": "user", "content": writer_prompt}],
             temperature=0.7,
-            timeout=120,
+            timeout=WRITER_TIMEOUT_SECONDS,
         )
         text = (out.final_report or "").strip()
         return {
@@ -2171,7 +2174,13 @@ def optimize_route():
                     _JOB_STORE[job_id]["error"] = f"{type(exc).__name__}: {exc}"
 
     threading.Thread(target=_run, daemon=True, name=f"optimize-{job_id[:8]}").start()
-    return jsonify({"job_id": job_id, "status": "running"})
+    return jsonify(
+        {
+            "job_id": job_id,
+            "status": "running",
+            "poll_timeout_ms": int(MAX_JOB_WAIT_SECONDS * 1000),
+        }
+    )
 
 
 @app.route("/job/<job_id>", methods=["GET"])
@@ -2183,6 +2192,18 @@ def job_status(job_id):
         return jsonify({"status": "not_found"}), 404
     if job["status"] == "running":
         elapsed = round(time.time() - job.get("started_at", time.time()), 1)
+        if elapsed > MAX_JOB_WAIT_SECONDS:
+            timeout_err = (
+                f"job exceeded max wait ({int(MAX_JOB_WAIT_SECONDS)}s); "
+                "likely interrupted by worker restart"
+            )
+            with _JOB_STORE_LOCK:
+                latest = _JOB_STORE.get(job_id)
+                if latest and latest.get("status") == "running":
+                    latest["status"] = "error"
+                    latest["error"] = timeout_err
+            app.logger.warning("==> /job/%s stale running job forced to error after %.1fs", job_id[:8], elapsed)
+            return jsonify({"status": "error", "error": timeout_err, "elapsed": elapsed})
         app.logger.debug("==> /job/%s running (%.1fs)", job_id[:8], elapsed)
         return jsonify({"status": "running", "elapsed": elapsed})
     if job["status"] == "error":
