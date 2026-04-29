@@ -199,19 +199,34 @@ def cos_sim(a, b):
     return inter / math.sqrt(len(wa) * len(wb))
 
 
-_NER_SYSTEM_PROMPT = (
-    "Extract named entities from the user's search query. "
-    "Return only concrete, specific entities: people, organizations, products, places, laws, events, and specific dates/years. "
-    "Exclude vague time phrases like 'recently', 'last week', 'today'. "
-    "Return an empty list if the query contains no named entities."
-)
+_ENTITY_STOPWORDS = {
+    "the", "a", "an", "and", "or", "for", "to", "of", "in", "on", "at", "by", "with",
+    "what", "when", "where", "why", "how", "is", "are", "was", "were", "be", "been",
+    "this", "that", "these", "those", "latest", "recent", "today", "yesterday",
+    "news", "analysis", "overview", "impact", "trend", "trends", "market", "markets",
+}
 
 
 def _extract_entities_fallback(text: str) -> list:
-    out = []
-    for y in re.findall(r"\b(20\d{2}|19\d{2})\b", text):
-        if y not in out:
-            out.append(y)
+    out: list[str] = []
+    seen: set[str] = set()
+
+    patterns = (
+        r"\b(20\d{2}|19\d{2})\b",  # years
+        r"\b[A-Z]{2,6}\b(?=\s+(?:stock|shares|earnings|guidance|ETF)\b)",  # finance tickers
+        r"\b(?:S&P\s?500|NASDAQ|Dow Jones|Federal Reserve|SEC|FTC|FDA|EU|UK|U\.S\.)\b",
+        r"\b(?:Act|Law|Directive|Regulation)\s+\d{2,4}(?:/\d+)?\b",
+    )
+    for pat in patterns:
+        for m in re.findall(pat, text):
+            ent = m.strip()
+            if not ent:
+                continue
+            k = ent.casefold()
+            if k in seen:
+                continue
+            seen.add(k)
+            out.append(ent)
     return out
 
 
@@ -219,42 +234,40 @@ def extract_named_entities(text: str) -> list:
     text = (text or "").strip()
     if not text:
         return []
-    try:
-        import instructor
-        from openai import OpenAI
-        from pydantic import BaseModel
+    seen: set[str] = set()
+    out: list[str] = []
 
-        class _NERResult(BaseModel):
-            entities: list[str]
+    # 1) Fast deterministic regex entities.
+    for ent in _extract_entities_fallback(text):
+        k = ent.casefold()
+        if k not in seen:
+            seen.add(k)
+            out.append(ent)
 
-        api_key = _env_first("DSAIL_OPENAI_API_KEY", "OPENAI_API_KEY")
-        if not api_key:
-            raise ValueError("no key")
-        client = instructor.from_openai(OpenAI(api_key=api_key))
-        result = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": _NER_SYSTEM_PROMPT},
-                {"role": "user", "content": text},
-            ],
-            response_model=_NERResult,
-            max_retries=1,
-        )
-        entities = [e.strip() for e in result.entities if e.strip()]
-        seen: set = set()
-        out: list = []
-        for e in entities:
-            k = e.casefold()
-            if k not in seen:
-                seen.add(k)
-                out.append(e)
-        for y in re.findall(r"\b(20\d{2}|19\d{2})\b", text):
-            if y.casefold() not in seen:
-                seen.add(y.casefold())
-                out.append(y)
-        return out
-    except Exception:
-        return _extract_entities_fallback(text)
+    # 2) Capture title-case spans as likely named entities.
+    spans = re.findall(
+        r"\b(?:[A-Z][a-z]+|[A-Z]{2,})(?:[\s\-]+(?:[A-Z][a-z]+|[A-Z]{2,}|of|the|and)){0,3}\b",
+        text,
+    )
+    for ent in spans:
+        ent = re.sub(r"\s+", " ", ent).strip(" ,.;:!?()[]{}\"'")
+        if not ent:
+            continue
+        parts = [p for p in re.split(r"[\s\-]+", ent) if p]
+        if len(parts) == 1 and parts[0].casefold() in _ENTITY_STOPWORDS:
+            continue
+        # Skip weak lowercase-only matches and generic words.
+        if not re.search(r"[A-Z]", ent):
+            continue
+        if ent.casefold() in _ENTITY_STOPWORDS:
+            continue
+        k = ent.casefold()
+        if k in seen:
+            continue
+        seen.add(k)
+        out.append(ent)
+
+    return out
 
 
 def extract_signals(query):

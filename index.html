@@ -346,6 +346,11 @@
   .pipe-progress-label{font-size:9px;color:var(--text-muted);letter-spacing:.06em;margin-bottom:5px;min-height:14px}
   .pipe-progress-track{height:6px;background:var(--surface3);border-radius:4px;overflow:hidden;border:1px solid var(--border)}
   .pipe-progress-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--green-dim),var(--accent));border-radius:3px;transition:width .12s linear}
+  .pipe-progress-wrap.waiting .pipe-progress-fill{width:34%!important;transition:none;animation:pipeProgressIndeterminate 1.15s ease-in-out infinite}
+  @keyframes pipeProgressIndeterminate{
+    0%{transform:translateX(-135%)}
+    100%{transform:translateX(245%)}
+  }
   .pipe-ticker-wrap{margin-top:8px;max-height:132px;overflow-y:auto;overflow-x:hidden;scrollbar-width:none}
   .pipe-ticker-wrap::-webkit-scrollbar{display:none}
   .pipe-ticker-line{font-size:11px;font-family:'IBM Plex Mono',monospace;color:#8b949e;line-height:1.7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:0;transform:translateY(4px);transition:opacity .25s ease,transform .25s ease,color .25s ease}
@@ -1601,10 +1606,11 @@ function startOptimizeProgress(){
   const lab = document.getElementById('pipeProgressLabel');
   if (!wrap || !fill || !lab) return;
   wrap.classList.add('on');
+  wrap.classList.remove('waiting');
   lab.textContent = 'Starting…';
   fill.style.width = '3%';
   const t0 = Date.now();
-  const labels = ['Decomposing…', 'Signals & routing…', 'Search & RAG…', 'Price fetch & plan…', 'Writing answer…', 'Finishing…'];
+  const labels = ['Query analysis…', 'Routing…', 'Search & retrieval…', 'Acquisition planning…', 'Answer synthesis…', 'Finalization…'];
   const span = 120000;
   clearTicker();
   const hints = [
@@ -1622,24 +1628,46 @@ function startOptimizeProgress(){
     'Scoring bid schedule…',
     'Packaging results…',
   ];
+  function labelForHintIndex(i) {
+    if (i <= 0) return labels[0];
+    if (i <= 2) return labels[1];
+    if (i <= 4) return labels[2];
+    if (i <= 7) return labels[3];
+    if (i <= 10) return labels[4];
+    return labels[5];
+  }
+  function pushHintWithAlignedLabel(i) {
+    tickerAddLine(hints[i]);
+    lab.textContent = labelForHintIndex(i);
+  }
   // First 10 hints at 2800ms each; final 3 (finishing phase) at 3500ms each
   const hintDelays = hints.map((_, i) => i < 10 ? 2800 : 3500);
   let hi = 0;
   let hintStopped = false;
-  tickerAddLine(hints[hi++]);
+  pushHintWithAlignedLabel(hi++);
   function scheduleNextHint() {
     if (hintStopped || hi >= hints.length) return;
     setTimeout(function() {
       if (hintStopped) return;
-      tickerAddLine(hints[hi++]);
+      pushHintWithAlignedLabel(hi++);
       scheduleNextHint();
     }, hintDelays[hi]);
   }
   scheduleNextHint();
   function tick(){
     const elapsed = Date.now() - t0;
+    if (hi >= hints.length) {
+      wrap.classList.add('waiting');
+      lab.textContent = labels[labels.length - 1];
+      return;
+    }
+    wrap.classList.remove('waiting');
     const pct = Math.min(97, 3 + (1 - Math.exp(-elapsed / 24000)) * 94);
     fill.style.width = pct.toFixed(1) + '%';
+    if (hi > 0) {
+      lab.textContent = labelForHintIndex(hi - 1);
+      return;
+    }
     const li = Math.min(labels.length - 1, Math.floor(elapsed / (span / labels.length)));
     lab.textContent = labels[li];
   }
@@ -1659,6 +1687,7 @@ function stopOptimizeProgress(done){
   const fill = document.getElementById('pipeProgressFill');
   const lab = document.getElementById('pipeProgressLabel');
   if (!wrap || !fill) return;
+  wrap.classList.remove('waiting');
   if (done){
     fill.style.width = '100%';
     if (lab) lab.textContent = 'Done';
@@ -1674,6 +1703,7 @@ function hidePipeProgress(){
   const fill = document.getElementById('pipeProgressFill');
   const lab = document.getElementById('pipeProgressLabel');
   if (wrap){
+    wrap.classList.remove('waiting');
     wrap.classList.remove('on');
     if (fill) fill.style.width = '0%';
     if (lab) lab.textContent = 'Starting…';
