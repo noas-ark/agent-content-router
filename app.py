@@ -1622,11 +1622,15 @@ def _run_fanout_round(
         if time.time() > deadline:
             break
         signals = _infer_signals(sq_query, _signals_goal_text(sq))
-        # When RAG is off (snippet-only scoring), scores land ~0.6-0.7; a 0.85
-        # floor marks every sub-query as a gap. Use a lower floor in that case.
+        # When RAG is off (snippet-only scoring), scores land ~0.6-0.7.
+        # Cap the threshold at 0.55 so snippet hits can actually pass as covered.
+        # With RAG enabled, trust the signal-computed threshold (typically 0.85-0.96).
         from rag_coverage import _embedding_allowed
-        _floor = 0.85 if _embedding_allowed() else 0.65
-        signals["quality_threshold"] = max(signals.get("quality_threshold", _floor), _floor)
+        if not _embedding_allowed():
+            signals["quality_threshold"] = 0.45
+        else:
+            _floor = 0.85
+            signals["quality_threshold"] = max(signals.get("quality_threshold", _floor), _floor)
         sq_with_signals.append((sq, signals))
         provider_used = "Brave"
         free = _brave_search(sq_query, count=BRAVE_WEB_RESULT_COUNT)

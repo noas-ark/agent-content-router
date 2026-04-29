@@ -17,24 +17,25 @@
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
   body{font-family:'IBM Plex Mono',monospace;background:var(--bg);color:var(--text);min-height:100vh;font-size:13px;line-height:1.55;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
   .topbar{height:44px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 20px;gap:14px}
-  .logo{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600}
+  .logo{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;text-decoration:none;color:var(--text)}
   .logo-icon{display:flex;align-items:center;flex-shrink:0}
   .logo-icon img{height:20px;width:auto;display:block;vertical-align:middle}
-  .logo .logo-text{color:var(--text)}
-  .sep{width:1px;height:18px;background:var(--border2)}
   .topbar a{color:var(--text-dim);text-decoration:none;font-size:10px;letter-spacing:.06em;padding:4px 10px;border-radius:4px;transition:color .15s,background .15s}
   .topbar a:hover{color:var(--text);background:var(--surface2)}
-  .topbar .badge{font-size:10px;padding:2px 7px;background:var(--accent-dim);color:var(--accent);border-radius:20px;border:1px solid rgba(233,30,140,.25);margin-left:auto}
+  .topbar .badge{font-size:10px;padding:2px 7px;background:var(--accent-dim);color:var(--accent);border-radius:20px;border:1px solid rgba(233,30,140,.25);margin-left:auto;pointer-events:none}
   .container{max-width:800px;margin:0 auto;padding:32px 24px}
   .h1{font-size:18px;font-weight:600;margin-bottom:8px}
-  .sub{font-size:11px;color:var(--text-muted);margin-bottom:28px}
-  .endpoint{margin-bottom:36px;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface)}
+  .sub{font-size:11px;color:var(--text-muted);margin-bottom:28px;line-height:1.7}
+  .section-label{font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--text-muted);margin-bottom:16px;margin-top:40px}
+  .endpoint{margin-bottom:24px;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface)}
   .endpoint-hdr{display:flex;align-items:center;gap:10px;padding:14px 18px;background:var(--surface2);border-bottom:1px solid var(--border)}
   .meth{font-size:10px;font-weight:600;padding:3px 8px;border-radius:3px;letter-spacing:.08em}
   .meth.post{background:rgba(63,185,80,.15);color:var(--green)}
   .meth.get{background:rgba(56,139,253,.15);color:var(--blue)}
   .path{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:500;color:var(--text)}
-  .endpoint-desc{font-size:11px;color:var(--text-dim);padding:14px 18px;border-bottom:1px solid var(--border);line-height:1.6}
+  .endpoint-desc{font-size:11px;color:var(--text-dim);padding:14px 18px;border-bottom:1px solid var(--border);line-height:1.7}
+  .endpoint-desc code{background:var(--surface2);padding:1px 5px;border-radius:3px;font-size:10px;color:var(--purple)}
+  .note{font-size:10px;color:var(--yellow);background:rgba(210,153,34,.08);border:1px solid rgba(210,153,34,.2);border-radius:5px;padding:8px 12px;margin-top:10px}
   .params{padding:14px 18px}
   .param-row{display:flex;align-items:center;gap:12px;margin-bottom:10px}
   .param-row:last-child{margin-bottom:0}
@@ -48,6 +49,7 @@
   .try-btn{padding:8px 16px;background:var(--accent);color:#000;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;letter-spacing:.06em;border:none;border-radius:5px;cursor:pointer;transition:background .15s}
   .try-btn:hover{background:#f545b8}
   .try-btn.loading{background:var(--surface3);color:var(--text-muted);cursor:wait}
+  .poll-status{font-size:10px;color:var(--text-muted)}
   .resp-wrap{margin-top:0;border-top:1px solid var(--border)}
   .resp-hdr{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);padding:8px 18px;background:var(--surface2)}
   .resp-body{padding:14px 18px;font-size:11px;font-family:'IBM Plex Mono',monospace;white-space:pre-wrap;word-break:break-word;max-height:320px;overflow-y:auto;line-height:1.6}
@@ -58,23 +60,29 @@
 </head>
 <body>
 <div class="topbar">
-  <div class="logo"><div class="logo-icon"><img src="/static/bootk-logo.svg" alt=""></div><span class="logo-text">bootk.ai</span></div>
-  <div class="sep"></div>
-  <a href="/">← Back</a>
-  <a href="/admin">Admin</a>
+  <a class="logo" href="/"><div class="logo-icon"><img src="/static/bootk-logo.svg" alt=""></div><span class="logo-text">bootk.ai</span></a>
+  <a href="/">← Home</a>
+  <a href="/playground">Playground</a>
   <span class="badge">API Reference</span>
 </div>
 <div class="container">
   <div class="h1">API Reference</div>
-  <div class="sub">Content routing, purchase plan optimization, and bidding. Use the fields below to try each endpoint.</div>
+  <div class="sub">Endpoints for content routing, purchase plan optimization, and real-time paid content fetching.<br>
+  <code style="background:var(--surface2);padding:2px 6px;border-radius:3px;font-size:10px;color:var(--purple)">Base URL: https://agent-content-router.onrender.com</code></div>
 
-  <!-- POST /optimize -->
+  <!-- OPTIMIZE -->
+  <div class="section-label">Optimize</div>
+
   <div class="endpoint" id="ep-optimize">
     <div class="endpoint-hdr">
       <span class="meth post">POST</span>
       <span class="path">/optimize</span>
     </div>
-    <div class="endpoint-desc">Optimize content purchase plan for a query. Returns signals, selected sources, bidding data (bid_ceiling, our_bid per source), and articles to scrape.</div>
+    <div class="endpoint-desc">
+      Decompose a query into sub-queries, search free sources, score coverage, and identify gaps where paid content is needed.
+      Returns a <code>job_id</code> immediately — poll <code>GET /job/&lt;job_id&gt;</code> for the result (typically 30–90s).
+      <div class="note">⚡ Async: this endpoint starts a background job. Use <code>/job/&lt;job_id&gt;</code> to retrieve the result.</div>
+    </div>
     <div class="params">
       <div class="param-row">
         <span class="param-lbl">query <i style="color:var(--red)">*</i></span>
@@ -87,6 +95,7 @@
     </div>
     <div class="try-row">
       <button class="try-btn" onclick="tryOptimize()">Try it</button>
+      <span class="poll-status" id="opt-poll-status"></span>
     </div>
     <div class="resp-wrap">
       <div class="resp-hdr">Response</div>
@@ -94,20 +103,75 @@
     </div>
   </div>
 
-  <!-- POST /feedback -->
+  <!-- GET /job/<job_id> -->
+  <div class="endpoint" id="ep-job">
+    <div class="endpoint-hdr">
+      <span class="meth get">GET</span>
+      <span class="path">/job/&lt;job_id&gt;</span>
+    </div>
+    <div class="endpoint-desc">
+      Poll for the result of a background optimize job. Returns <code>status: "running"</code> with elapsed seconds while in progress,
+      <code>status: "done"</code> with the full result payload, or <code>status: "error"</code> with an error message.
+      Jobs expire after 10 minutes.
+    </div>
+    <div class="params">
+      <div class="param-row">
+        <span class="param-lbl">job_id <i style="color:var(--red)">*</i></span>
+        <input type="text" class="param-inp" id="job-id" placeholder="Paste job_id from /optimize response">
+      </div>
+    </div>
+    <div class="try-row">
+      <button class="try-btn" onclick="tryJob()">Try it</button>
+    </div>
+    <div class="resp-wrap">
+      <div class="resp-hdr">Response</div>
+      <div class="resp-body pending" id="job-resp">Run the request to see the response.</div>
+    </div>
+  </div>
+
+  <!-- FETCH-EXA -->
+  <div class="section-label">Paid content</div>
+
+  <div class="endpoint" id="ep-fetch-exa">
+    <div class="endpoint-hdr">
+      <span class="meth post">POST</span>
+      <span class="path">/fetch-exa</span>
+    </div>
+    <div class="endpoint-desc">
+      On-demand fetch of paid content via Exa for a specific sub-query. Call this after <code>/optimize</code> identifies a gap
+      and you decide the content is worth buying. Returns results with <code>coverage_score</code> already computed, plus estimated cost.
+    </div>
+    <div class="params">
+      <div class="param-row">
+        <span class="param-lbl">query <i style="color:var(--red)">*</i></span>
+        <input type="text" class="param-inp" id="exa-query" placeholder="e.g. GLP-1 manufacturer list price history 2023–2025">
+      </div>
+    </div>
+    <div class="try-row">
+      <button class="try-btn" onclick="tryFetchExa()">Try it</button>
+    </div>
+    <div class="resp-wrap">
+      <div class="resp-hdr">Response</div>
+      <div class="resp-body pending" id="exa-resp">Run the request to see the response.</div>
+    </div>
+  </div>
+
+  <!-- FEEDBACK -->
+  <div class="section-label">Feedback & learning</div>
+
   <div class="endpoint" id="ep-feedback">
     <div class="endpoint-hdr">
       <span class="meth post">POST</span>
       <span class="path">/feedback</span>
     </div>
-    <div class="endpoint-desc">Submit outcome feedback for a prior optimization (from event_id in /optimize). Used for learning publisher performance.</div>
+    <div class="endpoint-desc">Submit outcome feedback for a prior optimization using the <code>event_id</code> from the <code>/optimize</code> result. Used to refine publisher performance over time.</div>
     <div class="params">
       <div class="param-row">
         <span class="param-lbl">event_id <i style="color:var(--red)">*</i></span>
         <input type="text" class="param-inp" id="fb-event" placeholder="event_id from /optimize response">
       </div>
       <div class="param-row">
-        <span class="param-lbl">sources_cited (JSON array)</span>
+        <span class="param-lbl">sources_cited (JSON)</span>
         <input type="text" class="param-inp" id="fb-cited" placeholder='["Bloomberg","Reuters"]' value='["Bloomberg","Reuters"]'>
       </div>
       <div class="param-row">
@@ -132,7 +196,7 @@
     </div>
   </div>
 
-  <!-- GET /learn -->
+  <!-- LEARN -->
   <div class="endpoint" id="ep-learn">
     <div class="endpoint-hdr">
       <span class="meth get">GET</span>
@@ -157,7 +221,7 @@
         </select>
       </div>
       <div class="param-row">
-        <span class="param-lbl">min_sample_size (query param)</span>
+        <span class="param-lbl">min_sample_size</span>
         <input type="text" class="param-inp" id="learn-min" placeholder="5" value="5">
       </div>
     </div>
@@ -169,96 +233,160 @@
       <div class="resp-body pending" id="learn-resp">Run the request to see the response.</div>
     </div>
   </div>
+
 </div>
 <script>
   const base = window.location.origin;
 
-  async function tryOptimize(){
+  async function tryOptimize() {
     const btn = document.querySelector('#ep-optimize .try-btn');
     const resp = document.getElementById('opt-resp');
+    const pollStatus = document.getElementById('opt-poll-status');
+    const jobIdInput = document.getElementById('job-id');
     const query = document.getElementById('opt-query').value.trim();
-    if(!query){ resp.textContent = 'query is required'; resp.className = 'resp-body err'; return; }
-    btn.classList.add('loading');
-    btn.disabled = true;
-    resp.textContent = 'Loading…';
-    resp.className = 'resp-body pending';
+    if (!query) { resp.textContent = 'query is required'; resp.className = 'resp-body err'; return; }
+    btn.classList.add('loading'); btn.disabled = true;
+    resp.textContent = 'Starting job…'; resp.className = 'resp-body pending';
+    pollStatus.textContent = '';
     try {
       const r = await fetch(base + '/optimize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          query: query,
-          customer_id: document.getElementById('opt-customer').value.trim() || 'default'
-        })
+        body: JSON.stringify({ query, customer_id: document.getElementById('opt-customer').value.trim() || 'default' })
       });
-      const data = await r.json().catch(()=>({}));
+      const init = await r.json().catch(() => ({}));
+      const jobId = init.job_id;
+      if (!jobId) {
+        resp.textContent = JSON.stringify(init, null, 2);
+        resp.className = 'resp-body ' + (r.ok ? 'ok' : 'err');
+        return;
+      }
+      // Populate the /job endpoint input for convenience
+      if (jobIdInput) jobIdInput.value = jobId;
+      resp.textContent = `Job started: ${jobId}\nPolling for result…`; resp.className = 'resp-body pending';
+      // Poll
+      const deadline = Date.now() + 120000;
+      let count = 0;
+      while (Date.now() < deadline) {
+        await new Promise(res => setTimeout(res, 3000));
+        count++;
+        const pr = await fetch(base + '/job/' + jobId);
+        const pj = await pr.json().catch(() => ({}));
+        const elapsed = pj.elapsed ? `${pj.elapsed}s` : `~${count * 3}s`;
+        pollStatus.textContent = `poll #${count} · ${elapsed} · ${pj.status}`;
+        if (pj.status === 'done') {
+          resp.textContent = JSON.stringify(pj.result, null, 2);
+          resp.className = 'resp-body ok';
+          pollStatus.textContent = `done in ~${count * 3}s`;
+          return;
+        }
+        if (pj.status === 'error') {
+          resp.textContent = 'Error: ' + (pj.error || 'unknown');
+          resp.className = 'resp-body err';
+          return;
+        }
+      }
+      resp.textContent = 'Timed out waiting for result (>120s)'; resp.className = 'resp-body err';
+    } catch(e) {
+      resp.textContent = 'Error: ' + e.message; resp.className = 'resp-body err';
+    } finally {
+      btn.classList.remove('loading'); btn.disabled = false;
+    }
+  }
+
+  async function tryJob() {
+    const btn = document.querySelector('#ep-job .try-btn');
+    const resp = document.getElementById('job-resp');
+    const jobId = document.getElementById('job-id').value.trim();
+    if (!jobId) { resp.textContent = 'job_id is required'; resp.className = 'resp-body err'; return; }
+    btn.classList.add('loading'); btn.disabled = true;
+    resp.textContent = 'Loading…'; resp.className = 'resp-body pending';
+    try {
+      const r = await fetch(base + '/job/' + jobId);
+      const data = await r.json().catch(() => ({}));
       resp.textContent = JSON.stringify(data, null, 2);
       resp.className = 'resp-body ' + (r.ok ? 'ok' : 'err');
     } catch(e) {
-      resp.textContent = 'Error: ' + e.message;
-      resp.className = 'resp-body err';
+      resp.textContent = 'Error: ' + e.message; resp.className = 'resp-body err';
+    } finally {
+      btn.classList.remove('loading'); btn.disabled = false;
     }
-    btn.classList.remove('loading');
-    btn.disabled = false;
   }
 
-  async function tryFeedback(){
+  async function tryFetchExa() {
+    const btn = document.querySelector('#ep-fetch-exa .try-btn');
+    const resp = document.getElementById('exa-resp');
+    const query = document.getElementById('exa-query').value.trim();
+    if (!query) { resp.textContent = 'query is required'; resp.className = 'resp-body err'; return; }
+    btn.classList.add('loading'); btn.disabled = true;
+    resp.textContent = 'Fetching…'; resp.className = 'resp-body pending';
+    try {
+      const r = await fetch(base + '/fetch-exa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query })
+      });
+      const data = await r.json().catch(() => ({}));
+      resp.textContent = JSON.stringify(data, null, 2);
+      resp.className = 'resp-body ' + (r.ok ? 'ok' : 'err');
+    } catch(e) {
+      resp.textContent = 'Error: ' + e.message; resp.className = 'resp-body err';
+    } finally {
+      btn.classList.remove('loading'); btn.disabled = false;
+    }
+  }
+
+  async function tryFeedback() {
     const btn = document.querySelector('#ep-feedback .try-btn');
     const resp = document.getElementById('fb-resp');
     const eventId = document.getElementById('fb-event').value.trim();
-    if(!eventId){ resp.textContent = 'event_id is required'; resp.className = 'resp-body err'; return; }
+    if (!eventId) { resp.textContent = 'event_id is required'; resp.className = 'resp-body err'; return; }
     let cited = document.getElementById('fb-cited').value.trim();
-    try { cited = cited ? JSON.parse(cited) : []; } catch(e){ cited = []; }
+    try { cited = cited ? JSON.parse(cited) : []; } catch(e) { cited = []; }
     const quality = document.getElementById('fb-quality').value.trim();
     const rating = document.getElementById('fb-rating').value.trim();
     const correction = document.getElementById('fb-correction').value.trim().toLowerCase() === 'true';
-    btn.classList.add('loading');
-    btn.disabled = true;
-    resp.textContent = 'Loading…';
-    resp.className = 'resp-body pending';
+    btn.classList.add('loading'); btn.disabled = true;
+    resp.textContent = 'Loading…'; resp.className = 'resp-body pending';
     try {
       const body = { event_id: eventId, sources_cited: cited, correction_made: correction };
-      if(quality) body.answer_quality = parseFloat(quality);
-      if(rating) body.user_rating = parseInt(rating, 10);
+      if (quality) body.answer_quality = parseFloat(quality);
+      if (rating) body.user_rating = parseInt(rating, 10);
       const r = await fetch(base + '/feedback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
-      const data = await r.json().catch(()=>({}));
+      const data = await r.json().catch(() => ({}));
       resp.textContent = JSON.stringify(data, null, 2);
       resp.className = 'resp-body ' + (r.ok ? 'ok' : 'err');
     } catch(e) {
-      resp.textContent = 'Error: ' + e.message;
-      resp.className = 'resp-body err';
+      resp.textContent = 'Error: ' + e.message; resp.className = 'resp-body err';
+    } finally {
+      btn.classList.remove('loading'); btn.disabled = false;
     }
-    btn.classList.remove('loading');
-    btn.disabled = false;
   }
 
-  async function tryLearn(){
+  async function tryLearn() {
     const btn = document.querySelector('#ep-learn .try-btn');
     const resp = document.getElementById('learn-resp');
     const cluster = document.getElementById('learn-cluster').value;
     const min = document.getElementById('learn-min').value.trim() || '5';
     const params = new URLSearchParams();
-    if(cluster) params.set('cluster', cluster);
+    if (cluster) params.set('cluster', cluster);
     params.set('min_sample_size', min);
-    btn.classList.add('loading');
-    btn.disabled = true;
-    resp.textContent = 'Loading…';
-    resp.className = 'resp-body pending';
+    btn.classList.add('loading'); btn.disabled = true;
+    resp.textContent = 'Loading…'; resp.className = 'resp-body pending';
     try {
       const r = await fetch(base + '/learn?' + params.toString());
-      const data = await r.json().catch(()=>({}));
+      const data = await r.json().catch(() => ({}));
       resp.textContent = JSON.stringify(data, null, 2);
       resp.className = 'resp-body ' + (r.ok ? 'ok' : 'err');
     } catch(e) {
-      resp.textContent = 'Error: ' + e.message;
-      resp.className = 'resp-body err';
+      resp.textContent = 'Error: ' + e.message; resp.className = 'resp-body err';
+    } finally {
+      btn.classList.remove('loading'); btn.disabled = false;
     }
-    btn.classList.remove('loading');
-    btn.disabled = false;
   }
 </script>
 </body>

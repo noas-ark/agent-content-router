@@ -1,0 +1,83 @@
+[
+  {
+    "url": "https://x402.org/demo/protected",
+    "description": "x402 reference demo endpoint",
+    "price_usdc": null,
+    "network": null,
+    "latency_ms": 201,
+    "status": 308,
+    "error": "Expected 402, got 308"
+  },
+  {
+    "url": "https://crypto-enrichment-api-production.up.railway.app/api/v1/price/BTC",
+    "description": "BTC price - crypto enrichment API",
+    "price_usdc": null,
+    "network": null,
+    "latency_ms": 345,
+    "status": 402,
+    "error": "No payment options in 402 response"
+  },
+  {
+    "url": "https://crypto-enrichment-api-production.up.railway.app/api/v1/analysis/ETH",
+    "description": "ETH analysis - crypto enrichment API",
+    "price_usdc": null,
+    "network": null,
+    "latency_ms": 229,
+    "status": 404,
+    "error": "Expected 402, got 404"
+  },
+  {
+    "url": "https://enrichx402.com/api/apollo/people-enrich",
+    "description": "Apollo people enrichment",
+    "price_usdc": null,
+    "network": null,
+    "latency_ms": 121,
+    "status": 405,
+    "error": "Expected 402, got 405"
+  },
+  {
+    "url": "https://enrichx402.com/api/hunter/domain-search",
+    "description": "Hunter.io domain search",
+    "price_usdc": null,
+    "network": null,
+    "latency_ms": 178,
+    "status": 404,
+    "error": "Expected 402, got 404"
+  },
+  {
+    "url": "https://api.messari.io/x402/asset/bitcoin/metrics",
+    "description": "Messari BTC metrics",
+    "price_usdc": null,
+    "network": null,
+    "latency_ms": 184,
+    "status": 404,
+    "error": "Expected 402, got 404"
+  },
+  {
+    "url": "https://api.nansen.ai/x402/wallet/label",
+    "description": "Nansen wallet label",
+    "price_usdc": null,
+    "network": null,
+    "latency_ms": 179,
+    "status": 404,
+    "error": "Expected 402, got 404"
+  },
+  {
+    "url": "https://x402-example.vercel.app/api/protected",
+    "description": "Vercel example - protected",
+    "price_usdc": null,
+    "network": null,
+    "latency_ms": 199,
+    "status": 404,
+    "error": "Expected 402, got 404"
+  },
+  {
+    "url": "https://x402-example.vercel.app/api/weather",
+    "description": "Vercel example - weather",
+    "price_usdc": null,
+    "network": null,
+    "latency_ms": 94,
+    "status": 404,
+    "error": "Expected 402, got 404"
+  }
+]

@@ -1,0 +1,62 @@
+[
+  {
+    "title": "Financial Times - Bias and Credibility - Media Bias/Fact Check",
+    "url": "https://mediabiasfactcheck.com/financial-times/",
+    "publisher": "Media Bias Fact Check",
+    "published_date": "2024-12-15T21:58:37",
+    "summarization_usd": null,
+    "full_display_usd": null,
+    "notes": {
+      "summarization": "Use once for RAG, citation, or grounding. Cannot train or display full article.",
+      "full_display": "Display full article in app once. Cannot train."
+    }
+  },
+  {
+    "title": "How to ask for a raise even in uncertain financial times - Fast Company",
+    "url": "https://www.fastcompany.com/91388267/how-to-ask-for-a-raise-in-an-uncertain-economy",
+    "publisher": "Fast Company",
+    "published_date": "2025-08-27T00:00:00",
+    "summarization_usd": null,
+    "full_display_usd": null,
+    "notes": {
+      "summarization": "Use once for RAG, citation, or grounding. Cannot train or display full article.",
+      "full_display": "Display full article in app once. Cannot train."
+    }
+  },
+  {
+    "title": "I was an eyewitness as the Financial Times went woke and I couldn\u2019t bear it",
+    "url": "https://www.telegraph.co.uk/business/2026/01/31/i-was-an-eyewitness-as-the-ft-went-woke-i-couldnt-bear-it/",
+    "publisher": "telegraph.co.uk",
+    "published_date": "2026-01-31T00:00:00",
+    "summarization_usd": null,
+    "full_display_usd": null,
+    "notes": {
+      "summarization": "Use once for RAG, citation, or grounding. Cannot train or display full article.",
+      "full_display": "Display full article in app once. Cannot train."
+    }
+  },
+  {
+    "title": "House Democrats Announce Legislation to Codify Role of Women in the Armed Services | Video | C-SPAN.org",
+    "url": "https://www.c-span.org/event/news-conference/house-democrats-announce-legislation-to-codify-role-of-women-in-the-armed-services/441625",
+    "publisher": "C-SPAN",
+    "published_date": "2026-03-27T04:57:42",
+    "summarization_usd": null,
+    "full_display_usd": null,
+    "notes": {
+      "summarization": "Use once for RAG, citation, or grounding. Cannot train or display full article.",
+      "full_display": "Display full article in app once. Cannot train."
+    }
+  },
+  {
+    "title": "Democrats Launch Another Probe Into Pete Hegseth\u2019s Alleged Effort To Buy Up Defense Stocks Before Iran War",
+    "url": "https://www.forbes.com/sites/alisondurkee/2026/04/02/democrats-launch-another-probe-into-pete-hegseths-alleged-effort-to-buy-up-defense-stocks-before-iran-war/",
+    "publisher": "Forbes",
+    "published_date": "2026-04-03T15:40:03",
+    "summarization_usd": null,
+    "full_display_usd": null,
+    "notes": {
+      "summarization": "Use once for RAG, citation, or grounding. Cannot train or display full article.",
+      "full_display": "Display full article in app once. Cannot train."
+    }
+  }
+]
