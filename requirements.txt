@@ -8,8 +8,8 @@ duckduckgo-search
 openai
 instructor
 pydantic
-# spaCy removed — requires blis C compilation which fails on some cloud build envs.
-# Entity extraction falls back to regex (see _get_spacy_nlp in app.py).
 # sentence-transformers removed — RAG now uses OpenAI embeddings API (zero local memory).
+spacy
+en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl
 beautifulsoup4
 numpy
