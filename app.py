@@ -1622,11 +1622,13 @@ def _run_fanout_round(
         if time.time() > deadline:
             break
         signals = _infer_signals(sq_query, _signals_goal_text(sq))
-        # When RAG is off (snippet-only scoring), scores land ~0.6-0.7.
-        # Cap the threshold at 0.55 so snippet hits can actually pass as covered.
-        # With RAG enabled, trust the signal-computed threshold (typically 0.85-0.96).
-        from rag_coverage import _embedding_allowed
-        if not _embedding_allowed():
+        # Use the actual model availability (not just whether RAG is allowed) to set
+        # the quality threshold. When the embedding model is unavailable, coverage
+        # scores are snippet-only (~0.5-0.7); a floor of 0.85 would mark everything
+        # as a gap. Cap at 0.45 so realistic snippet scores can pass as covered.
+        from rag_coverage import _get_model
+        _rag_active = _get_model() is not None
+        if not _rag_active:
             signals["quality_threshold"] = 0.45
         else:
             _floor = 0.85
