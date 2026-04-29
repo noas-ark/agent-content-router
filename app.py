@@ -196,129 +196,15 @@ def cos_sim(a, b):
     return inter / math.sqrt(len(wa) * len(wb))
 
 
-# Named-entity extraction: spaCy statistical NER (same family of tooling as production routers;
-# see https://spacy.io/models/en#en_core_web_sm). Regex only if spaCy / model unavailable.
-_SPACY_NLP = None  # lazy: loaded Language, False if load failed, None = not attempted
-
-_NER_LABELS = frozenset(
-    {
-        "PERSON",
-        "NORP",
-        "FAC",
-        "ORG",
-        "GPE",
-        "LOC",
-        "PRODUCT",
-        "EVENT",
-        "WORK_OF_ART",
-        "LAW",
-        "LANGUAGE",
-        "DATE",
-    }
+_NER_SYSTEM_PROMPT = (
+    "Extract named entities from the user's search query. "
+    "Return only concrete, specific entities: people, organizations, products, places, laws, events, and specific dates/years. "
+    "Exclude vague time phrases like 'recently', 'last week', 'today'. "
+    "Return an empty list if the query contains no named entities."
 )
 
 
-def _is_vague_temporal_for_linking(text: str) -> bool:
-    """
-    True if the span is a relative / deictic time phrase, not a linkable named entity.
-    spaCy often labels these as DATE; they should not appear under "entity linking".
-    """
-    t = text.strip().casefold()
-    if not t:
-        return True
-    if t in _VAGUE_TIME_EXACT:
-        return True
-    if _VAGUE_TIME_ANYWHERE.search(f" {t} "):
-        return True
-    return False
-
-
-# Whole-string or substring matches for "last year", "past 3 months", etc.
-_VAGUE_TIME_EXACT = frozenset(
-    {
-        "last year",
-        "this year",
-        "next year",
-        "last week",
-        "this week",
-        "next week",
-        "last month",
-        "this month",
-        "next month",
-        "last quarter",
-        "this quarter",
-        "next quarter",
-        "yesterday",
-        "today",
-        "tomorrow",
-        "tonight",
-        "last night",
-        "this morning",
-        "right now",
-        "recently",
-        "lately",
-        "currently",
-    }
-)
-
-_VAGUE_TIME_ANYWHERE = re.compile(
-    r"\b(?:"
-    r"last\s+year|this\s+year|next\s+year|"
-    r"last\s+week|this\s+week|next\s+week|"
-    r"last\s+month|this\s+month|next\s+month|"
-    r"last\s+quarter|this\s+quarter|next\s+quarter|"
-    r"yesterday|today|tomorrow|tonight|recently|lately|currently|"
-    r"last\s+night|this\s+morning|right\s+now|"
-    r"(?:last|this|next|past|coming)\s+(?:year|week|month|quarter|day|night|summer|winter|spring|fall|autumn)\b|"
-    r"(?:last|next|this)\s+\d{1,3}\s+(?:hours?|days?|weeks?|months?|years?)\b|"
-    r"\d+\s+(?:years?|months?|weeks?|days?)\s+ago"
-    r")\b",
-    re.IGNORECASE,
-)
-
-
-def _get_spacy_nlp():
-    """
-    Lazy-load spaCy NER once. Tries `import en_core_web_sm` first (works when the model
-    wheel is installed via pip); then `spacy.load("en_core_web_sm")`.
-
-    If both fail, the usual cause is: `pip install` without the `en_core_web_sm` package
-    (see requirements.txt). Install deps and check logs for the underlying exception.
-    """
-    global _SPACY_NLP
-    if _SPACY_NLP is not None:
-        return None if _SPACY_NLP is False else _SPACY_NLP
-    err_chain = []
-    try:
-        import en_core_web_sm  # type: ignore
-
-        _SPACY_NLP = en_core_web_sm.load()
-        logger.info("spaCy NER: loaded en_core_web_sm")
-        return _SPACY_NLP
-    except Exception as e:
-        err_chain.append(f"en_core_web_sm.load(): {e!r}")
-    try:
-        import spacy  # type: ignore
-
-        _SPACY_NLP = spacy.load("en_core_web_sm")
-        logger.info("spaCy NER: loaded via spacy.load('en_core_web_sm')")
-        return _SPACY_NLP
-    except Exception as e:
-        err_chain.append(f"spacy.load(): {e!r}")
-    _SPACY_NLP = False
-    logger.warning(
-        "spaCy NER unavailable — entity extraction falls back to years only (%s). "
-        "Fix: pip install -r requirements.txt (includes en_core_web_sm wheel).",
-        "; ".join(err_chain),
-    )
-    return None
-
-
-def _extract_entities_fallback_no_ner(text: str) -> list:
-    """
-    When the statistical NER model is missing, we do not fake entities with capital-letter
-    regex (that misses lowercase names and invents false positives). Only calendar years.
-    """
+def _extract_entities_fallback(text: str) -> list:
     out = []
     for y in re.findall(r"\b(20\d{2}|19\d{2})\b", text):
         if y not in out:
@@ -327,38 +213,45 @@ def _extract_entities_fallback_no_ner(text: str) -> list:
 
 
 def extract_named_entities(text: str) -> list:
-    """
-    Return ordered, de-duplicated entity strings for routing / UI.
-    Prefer spaCy NER spans (ORG, PERSON, GPE, …); add 4-digit years if not already covered.
-    """
     text = (text or "").strip()
     if not text:
         return []
-    nlp = _get_spacy_nlp()
-    if nlp:
-        doc = nlp(text)
+    try:
+        import instructor
+        from openai import OpenAI
+        from pydantic import BaseModel
+
+        class _NERResult(BaseModel):
+            entities: list[str]
+
+        api_key = _env_first("DSAIL_OPENAI_API_KEY", "OPENAI_API_KEY")
+        if not api_key:
+            raise ValueError("no key")
+        client = instructor.from_openai(OpenAI(api_key=api_key))
+        result = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": _NER_SYSTEM_PROMPT},
+                {"role": "user", "content": text},
+            ],
+            response_model=_NERResult,
+            max_retries=1,
+        )
+        entities = [e.strip() for e in result.entities if e.strip()]
         seen: set = set()
         out: list = []
-        for ent in doc.ents:
-            if ent.label_ not in _NER_LABELS:
-                continue
-            t = ent.text.strip()
-            if len(t) < 2:
-                continue
-            if ent.label_ == "DATE" and _is_vague_temporal_for_linking(t):
-                continue
-            k = t.casefold()
-            if k in seen:
-                continue
-            seen.add(k)
-            out.append(t)
-        for m in re.finditer(r"\b(20\d{2}|19\d{2})\b", text):
-            y = m.group(1)
+        for e in entities:
+            k = e.casefold()
+            if k not in seen:
+                seen.add(k)
+                out.append(e)
+        for y in re.findall(r"\b(20\d{2}|19\d{2})\b", text):
             if y.casefold() not in seen:
                 seen.add(y.casefold())
                 out.append(y)
         return out
-    return _extract_entities_fallback_no_ner(text)
+    except Exception:
+        return _extract_entities_fallback(text)
 
 
 def extract_signals(query):
@@ -367,7 +260,7 @@ def extract_signals(query):
 
     Emits:
     - queryUnderstanding: purchase_intent (content type, domain, freshness need, quality floor),
-      entity_linking (spaCy NER spans), intent_template, trending_signal, query_cluster,
+      entity_linking (NER spans), intent_template, trending_signal, query_cluster,
       routing_rules_fired, tier_strategy
     - intent + intentScores (keyword cosine vs fixed intent profile bags)
     - entities (same strings as entity_linking)
@@ -751,7 +644,6 @@ def _instructor_client():
 
 
 def _extract_entities_local(text: str) -> list:
-    """Same NER path as extract_signals (spaCy + regex fallback)."""
     return extract_named_entities(text)
 
 
@@ -1622,17 +1514,18 @@ def _run_fanout_round(
         if time.time() > deadline:
             break
         signals = _infer_signals(sq_query, _signals_goal_text(sq))
-        # Use the actual model availability (not just whether RAG is allowed) to set
-        # the quality threshold. When the embedding model is unavailable, coverage
-        # scores are snippet-only (~0.5-0.7); a floor of 0.85 would mark everything
-        # as a gap. Cap at 0.45 so realistic snippet scores can pass as covered.
+        # Calibrate per-subquery threshold to the actual scoring distribution.
+        # Snippet-only scores (RAG disabled) peak at ~0.75-0.88 for well-matched
+        # free news results; 0.72 lets those pass while niche/proprietary content
+        # (scores ~0.30-0.68) still triggers Exa. RAG scores peak slightly higher
+        # (~0.75-0.85), so cap at 0.75 for that path.
         from rag_coverage import _get_model
         _rag_active = _get_model() is not None
         if not _rag_active:
-            signals["quality_threshold"] = 0.45
+            signals["quality_threshold"] = 0.72
         else:
-            _floor = 0.85
-            signals["quality_threshold"] = max(signals.get("quality_threshold", _floor), _floor)
+            _cap = 0.75
+            signals["quality_threshold"] = min(signals.get("quality_threshold", _cap), _cap)
         sq_with_signals.append((sq, signals))
         provider_used = "Brave"
         free = _brave_search(sq_query, count=BRAVE_WEB_RESULT_COUNT)
@@ -2418,6 +2311,5 @@ if __name__ == "__main__":
     p.add_argument("--port", type=int, default=5001, help="Port (default 5001; macOS often uses 5000 for AirPlay)")
     p.add_argument("--host", default="127.0.0.1", help="Bind host")
     args = p.parse_args()
-    _get_spacy_nlp()
     print(f" * Open in browser: http://{args.host}:{args.port}/")
     app.run(debug=True, host=args.host, port=args.port)
