@@ -18,6 +18,8 @@ from urllib.parse import urlparse
 
 from dotenv import load_dotenv
 load_dotenv()
+# Default to snippet-only scoring (no RAG fetch/embed) unless explicitly overridden.
+os.environ.setdefault("BOOTK_DISABLE_RAG", "1")
 
 from flask import Flask, request, jsonify, send_from_directory, Response, stream_with_context
 
