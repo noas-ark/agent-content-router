@@ -41,7 +41,7 @@ MAX_OPTIMIZE_SECONDS = float(os.environ.get("MAX_OPTIMIZE_SECONDS", "90"))
 WRITER_TIMEOUT_SECONDS = float(os.environ.get("WRITER_TIMEOUT_SECONDS", "120"))
 JOB_POLL_BUFFER_SECONDS = float(os.environ.get("JOB_POLL_BUFFER_SECONDS", "45"))
 MAX_JOB_WAIT_SECONDS = MAX_OPTIMIZE_SECONDS + WRITER_TIMEOUT_SECONDS + JOB_POLL_BUFFER_SECONDS
-QUALITY_FLOOR = float(os.environ.get("QUALITY_FLOOR", "0.72"))
+QUALITY_FLOOR = float(os.environ.get("QUALITY_FLOOR", "0.56"))
 # One Valyu tier-diff probe per gap by default (up to this many per /optimize).
 MAX_VALYU_PROBES_PER_REQUEST = max(1, int(os.environ.get("MAX_VALYU_PROBES_PER_REQUEST", "5")))
 # Max total fanout rounds (1 = no re-fanout; 2 = one follow-up round if critic says need_more).
